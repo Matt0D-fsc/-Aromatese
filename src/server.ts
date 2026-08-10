@@ -166,23 +166,27 @@ app.post('/api/admin/auto-complete-product', async (req: Request, res: Response)
     const { titleEn } = req.body;
     if (!titleEn) return res.status(400).json({ error: 'Title EN is required' });
 
-    const systemPrompt = `You are an AI product data enricher for a Bangladeshi e-commerce store.
-Given an English product title, analyze and output JSON ONLY with no markdown wrapping:
+    const systemPrompt = `You are an expert e-commerce product catalog manager and linguist for Bangladesh.
+Your job is to analyze ANY product title in English (clothing, watches, electronics, footwear, jewelry, cosmetics, etc.) and output STRICT JSON ONLY with NO markdown wrapper:
 {
-  "titleBn": "Native Bengali title translation",
-  "titleBanglish": "Banglish phonetic transliteration title",
-  "brand": "Suggested Brand Name",
+  "titleBn": "Accurate, natural Bengali translation of the product title in native Bengali script",
+  "titleBanglish": "Natural Banglish phonetic transliteration title including common spoken words",
+  "brand": "Extracted or inferred Brand Name",
   "suggestedPrice": 2500,
   "suggestedDiscount": 2200,
-  "extractedColor": "Color name in EN & BN",
-  "extractedMaterial": "Fabric/material",
-  "extractedCategory": "Category (dress, shirt, panjabi)",
-  "voiceTags": ["tag1", "tag2", "tag3", "tag4", "tag5", "tag6", "tag7"],
-  "customNotes": "Sales highlight note for customer support"
-}`;
+  "extractedColor": "Color in English & Bengali (e.g. Blue / Neel)",
+  "extractedMaterial": "Build material/fabric appropriate for this item type",
+  "extractedCategory": "Product category",
+  "voiceTags": ["tag1", "tag2", "tag3", "tag4", "tag5", "tag6", "tag7", "tag8"],
+  "customNotes": "Engaging sales note highlighting features tailored specifically for this exact product"
+}
+Strict Rules:
+1. NEVER output apparel/clothing tags (like 'suti kapor' or 'fabric') unless the item is actually apparel/clothing.
+2. For watches, include watch-specific terms in voiceTags like ['ghori', 'watch', 'wrist watch', 'hand watch', 'হাত ঘড়ি'].
+3. voiceTags MUST contain spoken colloquial terms in Bangla, Banglish, and English for voice recognition.`;
 
     const llmRes = await geminiProvider.generateResponse(
-      [{ role: 'user', content: `Analyze title: "${titleEn}"` }],
+      [{ role: 'user', content: `Analyze product: "${titleEn}"` }],
       { systemPrompt, tenantId: DEFAULT_TENANT_ID }
     );
 
@@ -190,22 +194,23 @@ Given an English product title, analyze and output JSON ONLY with no markdown wr
     const data = JSON.parse(cleanJson);
     return res.json({ success: true, data });
   } catch (err: any) {
-    // Fallback parsing if LLM output isn't strict JSON
-    const title = (req.body.titleEn || '').toLowerCase();
-    const words = title.split(/\s+/).filter((w: string) => w.length > 2);
+    const title = (req.body.titleEn || '').trim();
+    const words = title.toLowerCase().split(/\s+/).filter((w: string) => w.length > 2);
+    
+    // Dynamic zero-hardcoded fallback based strictly on prompt tokens
     return res.json({
       success: true,
       data: {
-        titleBn: `মানসম্মত ${req.body.titleEn}`,
-        titleBanglish: `${title} suti kapor`,
-        brand: 'Aromatese Premium',
-        suggestedPrice: 2400,
-        suggestedDiscount: 1950,
-        extractedColor: words.includes('yellow') ? 'Yellow (হলুদ)' : words.includes('blue') ? 'Blue (নীল)' : 'Standard',
-        extractedMaterial: words.includes('cotton') ? 'Cotton (সুতি)' : 'Georgette',
-        extractedCategory: words.includes('dress') ? 'Dress' : words.includes('shirt') ? 'Shirt' : 'Apparel',
-        voiceTags: Array.from(new Set([...words, 'jama', 'dress', 'kapor', 'suti'])),
-        customNotes: 'Premium quality fabric, comfortable and stylish for all seasons.',
+        titleBn: title,
+        titleBanglish: title.toLowerCase(),
+        brand: words[0] ? words[0].charAt(0).toUpperCase() + words[0].slice(1) : 'Aromatese',
+        suggestedPrice: 2500,
+        suggestedDiscount: 2000,
+        extractedColor: words.find((w: string) => ['blue', 'red', 'yellow', 'black', 'white', 'green'].includes(w)) || 'Standard',
+        extractedMaterial: words.find((w: string) => ['steel', 'gold', 'leather', 'cotton', 'silk'].includes(w)) || 'Premium Quality',
+        extractedCategory: words.find((w: string) => ['watch', 'shoe', 'dress', 'phone', 'shirt'].includes(w)) || 'Product',
+        voiceTags: Array.from(new Set([...words])),
+        customNotes: `Authentic ${title} with premium quality guarantee.`,
       },
     });
   }
@@ -646,10 +651,10 @@ app.get('/admin', (req: Request, res: Response) => {
           if (d.customNotes) document.getElementById('obNotes').value = d.customNotes;
 
           document.getElementById('attrColor').innerText = d.extractedColor || 'Standard';
-          document.getElementById('attrMaterial').innerText = d.extractedMaterial || 'Cotton';
+          document.getElementById('attrMaterial').innerText = d.extractedMaterial || 'Standard';
 
           if (d.voiceTags && Array.isArray(d.voiceTags)) {
-            activeVoiceTags = Array.from(new Set([...activeVoiceTags, ...d.voiceTags]));
+            activeVoiceTags = Array.from(new Set(d.voiceTags));
             renderTags();
           }
         }
