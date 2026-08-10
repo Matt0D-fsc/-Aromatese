@@ -136,6 +136,7 @@ export class CatalogService implements ICatalogService {
         stockQuantity: item.stockQuantity ?? 0,
         isActive: item.isActive ?? existingProduct?.isActive ?? true,
         imageUrl: item.imageUrl ?? existingProduct?.imageUrl,
+        imageUrls: item.imageUrls ?? existingProduct?.imageUrls ?? (item.imageUrl ? [item.imageUrl] : []),
         voiceTags: item.voiceTags ?? existingProduct?.voiceTags ?? [],
         customNotes: item.customNotes ?? existingProduct?.customNotes,
         embedding: item.embedding ?? existingProduct?.embedding ?? defaultVector,

@@ -495,13 +495,13 @@ app.get('/admin', (req: Request, res: Response) => {
             <div class="glass-card" style="padding: 28px;">
               <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; color: var(--violet-deep);">Product Core Metadata & Photo</h3>
               
-              <!-- Dropzone Upload -->
-              <div class="dropzone-box" onclick="document.getElementById('obImageFile').click()">
+              <!-- Multi-Photo Dropzone Upload -->
+              <div class="dropzone-box" onclick="document.getElementById('obImageFiles').click()">
                 <div style="font-size: 28px;">📷</div>
-                <div style="font-size: 13px; font-weight: 600; margin-top: 6px; color: var(--violet-primary);">Click or Drag Product Photo to Upload</div>
-                <div style="font-size: 11px; color: var(--text-slate);">Generates pgvector Image Embedding automatically</div>
-                <input type="file" id="obImageFile" accept="image/*" style="display:none" onchange="previewProductImage(event)">
-                <img id="imgPreview" class="img-preview-thumb" style="display:none;">
+                <div style="font-size: 13px; font-weight: 600; margin-top: 6px; color: var(--violet-primary);">Click or Drag Multiple Product Photos to Upload</div>
+                <div style="font-size: 11px; color: var(--text-slate);">Generates pgvector Image Embeddings automatically for all assets</div>
+                <input type="file" id="obImageFiles" accept="image/*" multiple style="display:none" onchange="previewProductImages(event)">
+                <div id="imgPreviewGrid" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:12px;"></div>
               </div>
 
               <div class="form-group" style="margin-top: 18px;">
@@ -722,6 +722,13 @@ app.get('/admin', (req: Request, res: Response) => {
       \`).join('');
     }
 
+    function formatAiReplyHtml(text) {
+      if (!text) return '';
+      // Convert markdown image tags ![alt](url) to responsive img elements
+      let html = text.replace(/!\[(.*?)\]\((.*?)\)/g, '<br><img src="$2" alt="$1" style="max-width:100%; max-height:220px; border-radius:12px; margin-top:8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display:block;"><br>');
+      return html;
+    }
+
     async function sendChatMessage() {
       const input = document.getElementById('chatInput');
       const text = input.value.trim();
@@ -738,7 +745,8 @@ app.get('/admin', (req: Request, res: Response) => {
       });
       const data = await res.json();
 
-      stream.innerHTML += \`<div class="msg-bubble ai">\${data.replyText}</div>\`;
+      const replyHtml = formatAiReplyHtml(data.replyText);
+      stream.innerHTML += \`<div class="msg-bubble ai">\${replyHtml}</div>\`;
       stream.scrollTop = stream.scrollHeight;
     }
 
@@ -758,12 +766,12 @@ app.get('/admin', (req: Request, res: Response) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sku, titleEn, titleBn, titleBanglish, priceBdt, discountPriceBdt, stockQuantity, brand, customNotes, voiceTags: activeVoiceTags, imageUrl: uploadedImageBase64
+          sku, titleEn, titleBn, titleBanglish, priceBdt, discountPriceBdt, stockQuantity, brand, customNotes, voiceTags: activeVoiceTags, imageUrl: uploadedImageBase64s[0] || '', imageUrls: uploadedImageBase64s
         })
       });
       const data = await res.json();
       if (data.success) {
-        alert('Product onboarded with image & pgvector embeddings!');
+        alert('Product onboarded with ' + (uploadedImageBase64s.length || 1) + ' photos & pgvector embeddings synced!');
         toggleOnboardingForm();
         loadProducts();
       }

@@ -17,6 +17,7 @@ export interface ProductItem {
   stockQuantity: number;
   isActive: boolean;
   imageUrl?: string;
+  imageUrls?: string[];
   voiceTags?: string[];
   customNotes?: string;
   embedding?: number[];

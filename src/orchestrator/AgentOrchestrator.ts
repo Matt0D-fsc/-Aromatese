@@ -1,20 +1,27 @@
-import { ILLMProvider } from '../interfaces/ILLMProvider.js';
-import { IncomingWebhookJob } from '../interfaces/IMessageQueue.js';
+import { ILLMProvider, LLMMessageInput } from '../interfaces/ILLMProvider.js';
 import { KillSwitch } from '../services/KillSwitch.js';
 import { CatalogToolHandler, QUERY_CATALOG_TOOL_DEF, CHECK_STOCK_TOOL_DEF } from '../tools/CatalogTools.js';
-import { ResponseValidator, ToolCallExecutedResult } from '../services/ResponseValidator.js';
+import { ResponseValidator } from '../services/ResponseValidator.js';
 import { AuditLogger } from '../services/AuditLogger.js';
 import { VoiceProcessingService } from '../services/VoiceProcessingService.js';
 import { ImageMatchService } from '../services/ImageMatchService.js';
+import { IncomingWebhookJob } from '../interfaces/IMessageQueue.js';
 
 export interface OutboundMessageResult {
   tenantId: string;
-  channel: string;
+  channel: 'whatsapp' | 'messenger' | 'instagram';
   recipientId: string;
   replyText: string;
   isValidated: boolean;
   blockedByKillSwitch?: boolean;
   escalatedToHuman?: boolean;
+  imageUrl?: string;
+}
+
+export interface ToolCallExecutedResult {
+  toolName: string;
+  args: any;
+  result: any;
 }
 
 export class AgentOrchestrator {
@@ -25,6 +32,7 @@ export class AgentOrchestrator {
   private auditLogger: AuditLogger;
   private voiceService?: VoiceProcessingService;
   private imageService?: ImageMatchService;
+  private sessionHistoryMap: Map<string, LLMMessageInput[]> = new Map();
 
   constructor(
     llmProvider: ILLMProvider,
@@ -109,18 +117,28 @@ export class AgentOrchestrator {
       effectiveUserText = `Image matching product found: ${p.titleEn} (SKU: ${p.sku}, Price: ${p.priceBdt} BDT, Stock: ${p.stockQuantity} pcs). Offer to customer.`;
     }
 
-    const systemPrompt = `You are a helpful, polite, and persuasive AI sales assistant for a Bangladeshi e-commerce / F-commerce store.
+    const systemPrompt = `You are an authentic, conversational, warm, and highly persuasive AI sales consultant for a Bangladeshi e-commerce store.
 Rules:
-1. You converse naturally in Bangla, English, or Banglish (Romanized Bengali) matching the customer's language style.
-2. NEVER guess prices or stock numbers. ALWAYS call query_catalog or check_stock first to retrieve real numbers.
-3. If an item is out of stock, offer close available alternatives politely.
-4. DISAMBIGUATION & RECOMMENDATION: If a query matches multiple products (e.g. 2 blue dresses), politely present all matching items with their names, prices, and stock numbers, and ask the customer which specific one they are interested in!`;
+1. LANGUAGE: Converse naturally in Bangla, English, or Banglish (Romanized Bengali) matching the customer's language style.
+2. CONVERSATIONAL MEMORY & CONTEXT: Remember the full conversation context! When the customer asks follow-up questions (e.g., "chobi dekha jabe", "ghori ta ki blue?", "color ki?"), answer directly about the product currently under discussion in the chat history.
+3. NO DEAD ENDS & OUT OF STOCK ALTERNATIVES: If a product is out of stock (stock 0 pcs), explain politely and immediately offer top 2-3 similar in-stock products from catalog tools!
+4. SHOWING PRODUCT PHOTOS: If a customer asks to see pictures/photos ("chobi dekhan", "picture dekha jabe", "photo ache?"), or when recommending an item, check if the product has an image URL and include markdown image links like ![Product Title](imageUrl) or direct image links in your response!
+5. NEVER GUESS PRICES: Call query_catalog or check_stock when looking up prices or stock numbers.`;
 
     const userMessage = effectiveUserText || 'Hello';
 
+    // Retrieve conversation history for senderId
+    const historyKey = `${tenantId}:${senderId}`;
+    const currentHistory = this.sessionHistoryMap.get(historyKey) || [];
+
+    const conversationTurn: LLMMessageInput[] = [
+      ...currentHistory,
+      { role: 'user', content: userMessage },
+    ];
+
     // 4. First Turn LLM Generation with Grounding Tools
     const initialLlmResponse = await this.llmProvider.generateResponse(
-      [{ role: 'user', content: userMessage }],
+      conversationTurn,
       {
         systemPrompt,
         tools: [QUERY_CATALOG_TOOL_DEF, CHECK_STOCK_TOOL_DEF],
@@ -133,8 +151,8 @@ Rules:
     // 5. Execute Tool Calls if requested by LLM
     if (initialLlmResponse.toolCalls && initialLlmResponse.toolCalls.length > 0) {
       for (const call of initialLlmResponse.toolCalls) {
-        const result = await this.toolHandler.executeTool(tenantId, call.name, call.args);
-        executedTools.push(result);
+        const res = await this.toolHandler.executeTool(tenantId, call.name, call.args);
+        executedTools.push({ toolName: res.toolName, args: call.args, result: res.result });
       }
     }
 
@@ -142,10 +160,10 @@ Rules:
 
     // 6. Second Turn LLM Generation if tools were executed
     if (executedTools.length > 0) {
-      const followUpPrompt = `Tool Execution Results: ${JSON.stringify(executedTools)}. Generate a clear, polite response to the user in Banglish/Bangla with exact prices and stock.`;
+      const followUpPrompt = `Tool Execution Results: ${JSON.stringify(executedTools)}. Generate a clear, persuasive, conversational response in Banglish/Bangla matching the customer's exact question, providing prices, stock, and image links if available.`;
       const secondLlmResponse = await this.llmProvider.generateResponse(
         [
-          { role: 'user', content: userMessage },
+          ...conversationTurn,
           { role: 'assistant', content: `[Executed tools: ${executedTools.map(t => t.toolName).join(', ')}]` },
           { role: 'user', content: followUpPrompt },
         ],
@@ -157,31 +175,36 @@ Rules:
     // 7. Post-Generation Response Validator Safety Check
     const validationResult = this.validator.validateReply(finalReplyText, executedTools);
 
-    if (!validationResult.isValid) {
+    if (!validationResult.isValid && executedTools.length > 0) {
       console.warn(`[AgentOrchestrator] Post-Generation Validator rejected reply: ${validationResult.rejectedReason}`);
 
-      // Fallback rewrite to guaranteed grounded text
-      if (executedTools.length > 0) {
-        const productsList = (executedTools[0].result as any)?.products;
-        const singleProduct = (executedTools[0].result as any)?.product;
+      const productsList = (executedTools[0].result as any)?.products;
+      const singleProduct = (executedTools[0].result as any)?.product;
 
-        if (productsList && productsList.length > 0) {
-          if (productsList.length === 1) {
-            const p = productsList[0];
-            finalReplyText = `Haa, ${p.titleEn || p.titleBn} ekhon ache. Price ${p.priceBdt} BDT, stock ${p.stockQuantity} pcs. Delivery lagbe ki?`;
-          } else {
-            const itemsText = productsList.map((p: any, i: number) => `${i + 1}. ${p.titleEn} - Price ${p.priceBdt} BDT (Stock ${p.stockQuantity} pcs)`).join('\n');
-            finalReplyText = `Haa, amader kache ${productsList.length} ta item ache:\n${itemsText}\nApni kon ta dekhben?`;
-          }
-        } else if (singleProduct && singleProduct.priceBdt) {
-          finalReplyText = `Haa, ${singleProduct.titleEn || singleProduct.titleBn} ekhon ache. Price ${singleProduct.priceBdt} BDT, stock ${singleProduct.stockQuantity} pcs. Delivery lagbe ki?`;
+      if (productsList && productsList.length > 0) {
+        if (productsList.length === 1) {
+          const p = productsList[0];
+          const imageLink = p.imageUrl ? `\n![${p.titleEn}](${p.imageUrl})` : '';
+          finalReplyText = `Haa, ${p.titleEn || p.titleBn} ekhon ache. Price ${p.priceBdt} BDT, stock ${p.stockQuantity} pcs.${imageLink}\nDelivery lagbe ki?`;
         } else {
-          finalReplyText = `Dukkhto, apnar requested product ti amader current stock e nai. Apni amader baki catalog query korte paren!`;
+          const itemsText = productsList.map((p: any, i: number) => `${i + 1}. ${p.titleEn} - Price ${p.priceBdt} BDT (Stock ${p.stockQuantity} pcs)`).join('\n');
+          finalReplyText = `Haa, amader kache ${productsList.length} ta item ache:\n${itemsText}\nApni kon ta dekhben?`;
         }
+      } else if (singleProduct && singleProduct.priceBdt) {
+        const imageLink = singleProduct.imageUrl ? `\n![${singleProduct.titleEn}](${singleProduct.imageUrl})` : '';
+        finalReplyText = `Haa, ${singleProduct.titleEn || singleProduct.titleBn} ekhon ache. Price ${singleProduct.priceBdt} BDT, stock ${singleProduct.stockQuantity} pcs.${imageLink}\nDelivery lagbe ki?`;
       } else {
         finalReplyText = `Dukkhto, apnar requested product ti amader current stock e nai. Apni amader baki catalog query korte paren!`;
       }
     }
+
+    // Update conversation session history
+    currentHistory.push({ role: 'user', content: userMessage });
+    currentHistory.push({ role: 'assistant', content: finalReplyText });
+    if (currentHistory.length > 20) {
+      currentHistory.splice(0, currentHistory.length - 20);
+    }
+    this.sessionHistoryMap.set(historyKey, currentHistory);
 
     // 8. Audit Logging
     await this.auditLogger.logEvent({
@@ -189,7 +212,7 @@ Rules:
       eventType: 'AI_REPLY_SENT',
       llmPrompt: userMessage,
       llmRawResponse: finalReplyText,
-      toolCalls: executedTools.map(t => ({ name: t.toolName, result: t.result })),
+      toolCalls: executedTools.map(t => ({ name: t.toolName, result: t.result })) as Record<string, unknown>[],
       groundingProof: validationResult.groundedValues as any,
     });
 
@@ -200,5 +223,10 @@ Rules:
       replyText: finalReplyText,
       isValidated: true,
     };
+  }
+
+  public clearHistory(tenantId: string, senderId: string): void {
+    const historyKey = `${tenantId}:${senderId}`;
+    this.sessionHistoryMap.delete(historyKey);
   }
 }
