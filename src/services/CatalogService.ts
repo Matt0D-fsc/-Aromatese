@@ -1,13 +1,13 @@
 import { ICatalogService, ProductItem, CatalogSearchQuery } from '../interfaces/ICatalogService.js';
 
 export class CatalogService implements ICatalogService {
-  private productsDb: Map<string, ProductItem> = new Map(); // Composite Key: `${tenantId}:${productId}` or `${tenantId}:sku:${sku}`
+  private productsDb: Map<string, ProductItem> = new Map();
 
   /**
-   * Search catalog products by text (Bangla, English, Banglish) with dual-field matching.
+   * Search catalog products by text (Bangla, English, Banglish, voice_tags) with dual-field matching.
    */
   public async searchCatalog(query: CatalogSearchQuery): Promise<ProductItem[]> {
-    const { tenantId, searchTerm, maxPrice, inStockOnly = false, limit = 10 } = query;
+    const { tenantId, searchTerm, maxPrice, inStockOnly = false, limit = 20 } = query;
     const term = searchTerm ? searchTerm.toLowerCase().trim() : '';
 
     const results: ProductItem[] = [];
@@ -16,16 +16,20 @@ export class CatalogService implements ICatalogService {
       if (product.tenantId !== tenantId || !product.isActive) continue;
 
       if (inStockOnly && product.stockQuantity <= 0) continue;
-      if (maxPrice !== undefined && product.priceBdt > maxPrice) continue;
+      const effectivePrice = product.discountPriceBdt || product.priceBdt;
+      if (maxPrice !== undefined && effectivePrice > maxPrice) continue;
 
       if (term) {
         const matchesEn = product.titleEn.toLowerCase().includes(term);
         const matchesBn = product.titleBn ? product.titleBn.toLowerCase().includes(term) : false;
         const matchesBanglish = product.titleBanglish ? product.titleBanglish.toLowerCase().includes(term) : false;
         const matchesSku = product.sku.toLowerCase().includes(term);
-        const matchesTags = product.voiceTags ? product.voiceTags.some(t => t.toLowerCase().includes(term) || term.includes(t.toLowerCase())) : false;
+        const matchesBrand = product.brand ? product.brand.toLowerCase().includes(term) : false;
+        const matchesTags = product.voiceTags
+          ? product.voiceTags.some(t => t.toLowerCase().includes(term) || term.includes(t.toLowerCase()))
+          : false;
 
-        if (!matchesEn && !matchesBn && !matchesBanglish && !matchesSku && !matchesTags) {
+        if (!matchesEn && !matchesBn && !matchesBanglish && !matchesSku && !matchesBrand && !matchesTags) {
           continue;
         }
       }
@@ -59,7 +63,7 @@ export class CatalogService implements ICatalogService {
           found: true,
           product,
           stockQuantity: product.stockQuantity,
-          priceBdt: product.priceBdt,
+          priceBdt: product.discountPriceBdt || product.priceBdt,
         };
       }
     }
@@ -78,9 +82,12 @@ export class CatalogService implements ICatalogService {
     const scoredProducts: { product: ProductItem; score: number }[] = [];
 
     for (const product of this.productsDb.values()) {
-      if (product.tenantId !== tenantId || !product.isActive || !product.embedding) continue;
+      if (product.tenantId !== tenantId || !product.isActive) continue;
 
-      const score = this.cosineSimilarity(imageEmbedding, product.embedding);
+      const vec = product.imageEmbedding || product.embedding;
+      if (!vec) continue;
+
+      const score = this.cosineSimilarity(imageEmbedding, vec);
       scoredProducts.push({ product, score });
     }
 
@@ -89,7 +96,7 @@ export class CatalogService implements ICatalogService {
   }
 
   /**
-   * Bulk import or update products (Supports incremental stock sync).
+   * Bulk import or update products (Supports incremental stock & vector sync).
    */
   public async upsertProducts(
     tenantId: string,
@@ -111,6 +118,10 @@ export class CatalogService implements ICatalogService {
       const id = item.id || (existingProduct ? existingProduct.id : `prod-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`);
       const compositeKey = `${tenantId}:${id}`;
 
+      // Generate pseudo text embedding vector if missing
+      const textForVector = `${item.titleEn} ${item.titleBn || ''} ${item.titleBanglish || ''} ${(item.voiceTags || []).join(' ')} ${item.customNotes || ''}`;
+      const defaultVector = this.generatePseudoVector(textForVector);
+
       const fullProduct: ProductItem = {
         id,
         tenantId,
@@ -119,13 +130,16 @@ export class CatalogService implements ICatalogService {
         titleBn: item.titleBn ?? existingProduct?.titleBn,
         titleBanglish: item.titleBanglish ?? existingProduct?.titleBanglish,
         description: item.description ?? existingProduct?.description,
+        brand: item.brand ?? existingProduct?.brand,
         priceBdt: item.priceBdt,
+        discountPriceBdt: item.discountPriceBdt ?? existingProduct?.discountPriceBdt,
         stockQuantity: item.stockQuantity ?? 0,
         isActive: item.isActive ?? existingProduct?.isActive ?? true,
         imageUrl: item.imageUrl ?? existingProduct?.imageUrl,
-        voiceTags: item.voiceTags ?? existingProduct?.voiceTags,
+        voiceTags: item.voiceTags ?? existingProduct?.voiceTags ?? [],
         customNotes: item.customNotes ?? existingProduct?.customNotes,
-        embedding: item.embedding ?? existingProduct?.embedding,
+        embedding: item.embedding ?? existingProduct?.embedding ?? defaultVector,
+        imageEmbedding: item.imageEmbedding ?? existingProduct?.imageEmbedding ?? defaultVector,
       };
 
       this.productsDb.set(compositeKey, fullProduct);
@@ -149,5 +163,24 @@ export class CatalogService implements ICatalogService {
 
     if (normA === 0 || normB === 0) return 0;
     return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+  }
+
+  private generatePseudoVector(text: string): number[] {
+    const vec = new Array(768).fill(0);
+    const words = text.toLowerCase().split(/\W+/);
+    for (let i = 0; i < words.length; i++) {
+      const hash = this.simpleHash(words[i]);
+      vec[hash % 768] += 1.0;
+    }
+    return vec;
+  }
+
+  private simpleHash(str: string): number {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = (hash << 5) - hash + str.charCodeAt(i);
+      hash |= 0;
+    }
+    return Math.abs(hash);
   }
 }

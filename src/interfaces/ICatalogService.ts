@@ -1,6 +1,6 @@
 /**
  * Interface ICatalogService
- * Abstraction for Catalog Search, Dual-Field (Banglish + Bangla) Grounding, and Vector Search
+ * Abstraction for Catalog Search, Dual-Field (Banglish + Bangla) Grounding, Voice Tags, and Vector Search
  */
 
 export interface ProductItem {
@@ -11,13 +11,16 @@ export interface ProductItem {
   titleBn?: string;
   titleBanglish?: string;
   description?: string;
+  brand?: string;
   priceBdt: number;
+  discountPriceBdt?: number;
   stockQuantity: number;
   isActive: boolean;
   imageUrl?: string;
   voiceTags?: string[];
   customNotes?: string;
   embedding?: number[];
+  imageEmbedding?: number[];
 }
 
 export interface CatalogSearchQuery {
@@ -30,12 +33,12 @@ export interface CatalogSearchQuery {
 
 export interface ICatalogService {
   /**
-   * Search catalog products by text (Bangla, English, Banglish) with fuzzy matching.
+   * Search catalog products by text (Bangla, English, Banglish, voice_tags) with fuzzy matching.
    */
   searchCatalog(query: CatalogSearchQuery): Promise<ProductItem[]>;
 
   /**
-   * Retrieve real-time stock and price for a specific product or variant.
+   * Retrieve real-time stock and price for a specific product or SKU.
    */
   checkStock(tenantId: string, productIdOrSku: string): Promise<{
     found: boolean;
