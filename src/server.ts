@@ -18,8 +18,8 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
 const catalogService = new CatalogService();
 const toolHandler = new CatalogToolHandler(catalogService);
@@ -56,7 +56,7 @@ catalogService.upsertProducts(DEFAULT_TENANT_ID, [
     titleEn: 'Blue Cotton Midi Dress',
     titleBn: 'নীল সুতি মিডি ড্রেস',
     titleBanglish: 'blue suti midi dress neel',
-    brand: 'Aromatese Exclusive',
+    brand: 'ChatNab Atelier',
     priceBdt: 1800,
     discountPriceBdt: 1500,
     stockQuantity: 5,
@@ -69,13 +69,26 @@ catalogService.upsertProducts(DEFAULT_TENANT_ID, [
     titleEn: 'Bashanti Yellow Floral Dress',
     titleBn: 'বাসন্তী হলুদ ফ্লোরাল ড্রেস',
     titleBanglish: 'bashanti holud floral dress yellow halud',
-    brand: 'Aromatese Festive',
+    brand: 'ChatNab Festive',
     priceBdt: 2500,
     discountPriceBdt: 2200,
     stockQuantity: 6,
     isActive: true,
     voiceTags: ['holud', 'yellow', 'bashanti', 'halud', 'jama', 'dress', 'frock'],
     customNotes: 'Perfect for Pahela Baishakh, Haldi ceremony, and summer outings.',
+  },
+  {
+    sku: 'WATCH-OMEGA-SEAMASTER',
+    titleEn: 'Omega Seamaster Blue Watch Tourbillon',
+    titleBn: 'ওমেগা সি-মাস্টার ব্লু ওয়াচ ট্যুরবিয়ন',
+    titleBanglish: 'omega seamaster blue ghori watch tourbillon neel ghori',
+    brand: 'Omega',
+    priceBdt: 45000,
+    discountPriceBdt: 38500,
+    stockQuantity: 2,
+    isActive: true,
+    voiceTags: ['ghori', 'watch', 'neel', 'blue', 'omega', 'seamaster', 'tourbillon', 'wrist watch', 'হাত ঘড়ি'],
+    customNotes: 'Luxury automatic movement with sapphire crystal and blue sunray dial.',
   },
 ]);
 
@@ -203,7 +216,7 @@ Strict Rules:
       data: {
         titleBn: title,
         titleBanglish: title.toLowerCase(),
-        brand: words[0] ? words[0].charAt(0).toUpperCase() + words[0].slice(1) : 'Aromatese',
+        brand: words[0] ? words[0].charAt(0).toUpperCase() + words[0].slice(1) : 'ChatNab Atelier',
         suggestedPrice: 2500,
         suggestedDiscount: 2000,
         extractedColor: words.find((w: string) => ['blue', 'red', 'yellow', 'black', 'white', 'green'].includes(w)) || 'Standard',
@@ -224,7 +237,7 @@ app.get('/api/admin/products', async (req: Request, res: Response) => {
 
 app.post('/api/admin/products', async (req: Request, res: Response) => {
   try {
-    const { sku, titleEn, titleBn, titleBanglish, brand, priceBdt, discountPriceBdt, stockQuantity, voiceTags, customNotes, imageUrl } = req.body;
+    const { sku, titleEn, titleBn, titleBanglish, brand, priceBdt, discountPriceBdt, stockQuantity, voiceTags, customNotes, imageUrl, imageUrls } = req.body;
 
     const tagsArray = Array.isArray(voiceTags)
       ? voiceTags
@@ -238,13 +251,14 @@ app.post('/api/admin/products', async (req: Request, res: Response) => {
         titleEn,
         titleBn,
         titleBanglish,
-        brand: brand || 'Aromatese',
+        brand: brand || 'ChatNab Atelier',
         priceBdt: parseFloat(priceBdt),
         discountPriceBdt: discountPriceBdt ? parseFloat(discountPriceBdt) : undefined,
         stockQuantity: parseInt(stockQuantity, 10) || 0,
         voiceTags: tagsArray,
         customNotes,
         imageUrl,
+        imageUrls: Array.isArray(imageUrls) ? imageUrls : imageUrl ? [imageUrl] : [],
         isActive: true,
       },
     ]);
@@ -282,194 +296,648 @@ app.post('/api/admin/kill-switch', (req: Request, res: Response) => {
   return res.json({ success: true, globalKillSwitchActive: killSwitch.isGlobalAiDisabled() });
 });
 
-// --- FRONTEND UI DASHBOARD & PLAYGROUND (WITH LIGHT/DARK TOGGLE & AI AUTO-COMPLETE) ---
-app.get('/admin', (req: Request, res: Response) => {
+// --- ROOT & ADMIN DASHBOARD (CHATNAB KINETIC AGENCY DESIGN SYSTEM) ---
+app.get(['/', '/admin'], (req: Request, res: Response) => {
   res.send(`
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Aromatese — Awwwards Violet Multimodal AI Engine</title>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <title>ChatNab — Kinetic Autonomous Commerce Engine</title>
+  
+  <!-- Typography Matrix -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Motion Libraries -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script src="https://unpkg.com/lenis@1.1.9/dist/lenis.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+
   <style>
-    /* Light Theme (Default) */
+    /* Travertine & Warm Atelier Token Matrix */
+    :root {
+      --_font-display: 'Cinzel', 'Cormorant Garamond', Georgia, serif;
+      --_font-editorial: 'Cormorant Garamond', Georgia, serif;
+      --_font-default: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+      --_font-mono: 'JetBrains Mono', monospace;
+
+      --_animbezier: cubic-bezier(0.23, 0.65, 0.74, 1.09);
+      --_animspeed-fast: 0.15s;
+      --_animspeed-medium: 0.35s;
+      --_animspeed-slow: 0.7s;
+
+      /* Permanent Fixed Tokens */
+      --color-bronze: #C29B38;
+      --color-bronze-dark: #A67C1E;
+      --color-terracotta: #C85A32;
+      --color-gold: #D4AF37;
+      --color-emerald: #10B981;
+      --color-rose: #EF4444;
+    }
+
+    /* Light Scheme Palette (Organic Travertine Ground) */
     html[data-theme="light"] {
-      --bg-mesh: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 50%, #E2E8F0 100%);
-      --sidebar-bg: rgba(255, 255, 255, 0.82);
-      --glass-surface: rgba(255, 255, 255, 0.75);
-      --glass-border: rgba(255, 255, 255, 0.88);
-      --shadow-glass: 0 20px 40px -15px rgba(109, 40, 217, 0.08), 0 8px 32px 0 rgba(31, 38, 135, 0.07);
-      --violet-primary: #7C3AED;
-      --violet-deep: #6D28D9;
-      --magenta-glow: #EC4899;
-      --indigo-aura: #4F46E5;
-      --text-charcoal: #0F172A;
-      --text-slate: #64748B;
-      --input-bg: rgba(255, 255, 255, 0.85);
-      --msg-ai-bg: #FFFFFF;
-      --telemetry-bg: rgba(255, 255, 255, 0.7);
+      --base: #F7F5F0;
+      --base-tint: #EFECE6;
+      --base-bright: #FFFFFF;
+      --base-opp: #151412;
+      --base-opp-tint: #22201C;
+      
+      --t-bright: #151412;
+      --t-medium: #5E5B54;
+      --t-muted: #8F8B82;
+      --t-opp-bright: #F7F5F0;
+      --t-opp-muted: #A3A099;
+
+      --st-border: rgba(194, 155, 56, 0.22);
+      --st-border-subtle: rgba(21, 20, 18, 0.08);
+      --glass-surface: rgba(255, 255, 255, 0.78);
+      --glass-border: rgba(255, 255, 255, 0.9);
+      --shadow-atelier: 0 24px 48px -18px rgba(194, 155, 56, 0.12), 0 10px 30px -10px rgba(21, 20, 18, 0.06);
+
+      --chat-user-bg: linear-gradient(135deg, #C29B38, #C85A32);
+      --chat-ai-bg: #FFFFFF;
+      --input-bg: rgba(255, 255, 255, 0.9);
+      --telemetry-bg: rgba(247, 245, 240, 0.85);
     }
 
-    /* Dark Theme */
+    /* Dark Scheme Palette (Obsidian Travertine Ground) */
     html[data-theme="dark"] {
-      --bg-mesh: linear-gradient(135deg, #0B0F19 0%, #111827 50%, #1E1B4B 100%);
-      --sidebar-bg: rgba(15, 23, 42, 0.9);
-      --glass-surface: rgba(30, 27, 75, 0.55);
-      --glass-border: rgba(255, 255, 255, 0.12);
-      --shadow-glass: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
-      --violet-primary: #A855F7;
-      --violet-deep: #C084FC;
-      --magenta-glow: #F472B6;
-      --indigo-aura: #6366F1;
-      --text-charcoal: #F8FAFC;
-      --text-slate: #94A3B8;
-      --input-bg: rgba(15, 23, 42, 0.7);
-      --msg-ai-bg: #1E293B;
-      --telemetry-bg: rgba(15, 23, 42, 0.85);
+      --base: #151412;
+      --base-tint: #1F1D1A;
+      --base-bright: #0D0C0B;
+      --base-opp: #F7F5F0;
+      --base-opp-tint: #EFECE6;
+      
+      --t-bright: #F7F5F0;
+      --t-medium: #B5B2AB;
+      --t-muted: #7A7770;
+      --t-opp-bright: #151412;
+      --t-opp-muted: #5E5B54;
+
+      --st-border: rgba(212, 175, 55, 0.25);
+      --st-border-subtle: rgba(247, 245, 240, 0.1);
+      --glass-surface: rgba(31, 29, 26, 0.7);
+      --glass-border: rgba(247, 245, 240, 0.12);
+      --shadow-atelier: 0 24px 48px -18px rgba(0, 0, 0, 0.6);
+
+      --chat-user-bg: linear-gradient(135deg, #D4AF37, #C85A32);
+      --chat-ai-bg: #1F1D1A;
+      --input-bg: rgba(21, 20, 18, 0.85);
+      --telemetry-bg: rgba(31, 29, 26, 0.85);
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Outfit', sans-serif; transition: background 0.3s ease, color 0.3s ease; }
-    body { background: var(--bg-mesh); color: var(--text-charcoal); display: flex; height: 100vh; overflow: hidden; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--base);
+      color: var(--t-bright);
+      font-family: var(--_font-default);
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+      transition: background var(--_animspeed-medium) ease, color var(--_animspeed-medium) ease;
+    }
 
-    /* Glass Sidebar */
-    .sidebar { width: 280px; background: var(--sidebar-bg); backdrop-filter: blur(20px) saturate(180%); border-right: 1px solid var(--glass-border); padding: 28px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: var(--shadow-glass); }
-    .brand-title { font-size: 24px; font-weight: 700; background: linear-gradient(135deg, var(--violet-deep), var(--magenta-glow)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .nav-list { margin-top: 36px; list-style: none; }
-    .nav-item { padding: 14px 18px; margin-bottom: 10px; border-radius: 12px; cursor: pointer; color: var(--text-slate); font-weight: 500; transition: all 0.3s ease; display: flex; align-items: center; gap: 10px; }
-    .nav-item.active, .nav-item:hover { background: rgba(124, 58, 237, 0.15); color: var(--violet-primary); transform: translateX(4px); font-weight: 600; }
+    /* Kinetic Custom Cursor */
+    .mxd-cursor-dot {
+      position: fixed;
+      top: 0; left: 0;
+      width: 8px; height: 8px;
+      background: var(--color-bronze);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 9999;
+      transform: translate(-50%, -50%);
+      transition: width 0.2s, height 0.2s, background 0.2s;
+    }
+    .mxd-cursor-aura {
+      position: fixed;
+      top: 0; left: 0;
+      width: 36px; height: 36px;
+      border: 1px solid var(--color-bronze);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 9998;
+      transform: translate(-50%, -50%);
+      transition: transform 0.08s ease-out, width 0.3s, height 0.3s, border-color 0.3s;
+    }
 
-    /* Header */
-    .main-workspace { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-    .top-header { height: 74px; background: var(--glass-surface); backdrop-filter: blur(16px); border-bottom: 1px solid var(--glass-border); padding: 0 36px; display: flex; align-items: center; justify-content: space-between; }
-    .header-actions { display: flex; align-items: center; gap: 16px; }
+    /* Kinetic Glass Sidebar */
+    .sidebar {
+      width: 290px;
+      background: var(--glass-surface);
+      backdrop-filter: blur(24px) saturate(160%);
+      border-right: 1px solid var(--st-border-subtle);
+      padding: 32px 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: var(--shadow-atelier);
+      z-index: 50;
+    }
+    .brand-box { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+    .brand-title {
+      font-family: var(--_font-display);
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      background: linear-gradient(135deg, var(--color-bronze), var(--color-terracotta));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .nav-list { margin-top: 40px; list-style: none; }
+    .nav-item {
+      padding: 14px 18px;
+      margin-bottom: 10px;
+      border-radius: 12px;
+      cursor: pointer;
+      color: var(--t-medium);
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      transition: all var(--_animspeed-medium) var(--_animbezier);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border: 1px solid transparent;
+    }
+    .nav-item:hover, .nav-item.active {
+      background: var(--base-tint);
+      color: var(--t-bright);
+      border-color: var(--st-border);
+      transform: translateX(6px);
+    }
+    .nav-item.active {
+      border-left: 3px solid var(--color-bronze);
+    }
 
-    .theme-toggle-btn { background: rgba(124, 58, 237, 0.12); border: 1px solid var(--glass-border); color: var(--violet-primary); padding: 8px 16px; border-radius: 20px; font-weight: 600; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+    /* Workspace Shell */
+    .workspace-shell {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+    .top-bar {
+      height: 76px;
+      background: var(--glass-surface);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--st-border-subtle);
+      padding: 0 36px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 40;
+    }
+    .telemetry-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      border-radius: 24px;
+      font-family: var(--_font-mono);
+      font-size: 12px;
+      font-weight: 500;
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--color-emerald);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+    }
+    .action-group { display: flex; align-items: center; gap: 14px; }
+    .btn-theme {
+      background: var(--base-tint);
+      border: 1px solid var(--st-border);
+      color: var(--t-bright);
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .btn-theme:hover { transform: scale(1.04); }
+    .btn-kill {
+      background: var(--color-rose);
+      color: #fff;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-weight: 700;
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3);
+    }
 
-    .pill-badge { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; padding: 6px 16px; border-radius: 20px; background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.3); }
-
-    .tab-pane { display: none; height: calc(100vh - 74px); flex: 1; opacity: 0; }
-    .tab-pane.active { display: flex; opacity: 1; flex-direction: column; }
+    /* Content Panes */
+    .tab-viewport { display: none; height: calc(100vh - 76px); overflow-y: auto; opacity: 0; }
+    .tab-viewport.active { display: flex; flex-direction: column; opacity: 1; }
 
     /* Glass Cards */
-    .glass-card { background: var(--glass-surface); backdrop-filter: blur(16px) saturate(180%); border: 1px solid var(--glass-border); border-radius: 20px; box-shadow: var(--shadow-glass); transition: transform 0.3s ease; }
-    .glass-card:hover { transform: translateY(-3px) perspective(1000px) rotateX(1deg); }
+    .atelier-card {
+      background: var(--glass-surface);
+      backdrop-filter: blur(20px) saturate(160%);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      box-shadow: var(--shadow-atelier);
+      transition: transform 0.4s var(--_animbezier), box-shadow 0.4s var(--_animbezier);
+    }
+    .atelier-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 30px 60px -15px rgba(194, 155, 56, 0.18);
+    }
 
-    /* Onboarding Workspace & Modal */
-    .onboarding-container { padding: 36px; overflow-y: auto; width: 100%; height: 100%; }
-    .onboard-top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-    .btn-primary { background: linear-gradient(135deg, var(--violet-primary), var(--magenta-glow)); color: #fff; padding: 12px 24px; border-radius: 12px; font-weight: 700; font-size: 14px; border: none; cursor: pointer; box-shadow: 0 10px 20px -5px rgba(124, 58, 237, 0.4); display: flex; align-items: center; gap: 8px; }
+    /* TAB 0: KINETIC HERO INTRO & PHYSICS SHOWCASE */
+    .hero-section {
+      padding: 48px 48px 24px 48px;
+      display: flex;
+      flex-direction: column;
+      gap: 36px;
+      max-width: 1440px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    .hero-headline-wrap { max-width: 900px; }
+    .hero-eyebrow {
+      font-family: var(--_font-mono);
+      font-size: 13px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--color-bronze);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .hero-title {
+      font-family: var(--_font-display);
+      font-size: clamp(3rem, 5vw, 4.8rem);
+      font-weight: 700;
+      line-height: 1.08;
+      letter-spacing: -0.02em;
+      color: var(--t-bright);
+    }
+    .hero-title em {
+      font-family: var(--_font-editorial);
+      font-weight: 400;
+      font-style: italic;
+      color: var(--color-bronze);
+    }
+    .hero-subtitle {
+      font-size: 17px;
+      line-height: 1.6;
+      color: var(--t-medium);
+      margin-top: 16px;
+      max-width: 720px;
+    }
+    .hero-cta-row { display: flex; gap: 16px; margin-top: 24px; }
+    .btn-kinetic-primary {
+      background: linear-gradient(135deg, var(--color-bronze), var(--color-terracotta));
+      color: #FFFFFF;
+      padding: 14px 28px;
+      border-radius: 14px;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 12px 28px -6px rgba(194, 155, 56, 0.4);
+      transition: transform 0.25s var(--_animbezier);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-kinetic-primary:hover { transform: translateY(-2px) scale(1.02); }
 
-    .onboarding-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
-    .form-group { margin-bottom: 18px; }
-    .form-label { display: block; font-size: 13px; font-weight: 600; color: var(--text-slate); margin-bottom: 6px; }
-    .form-input { width: 100%; padding: 12px 16px; border-radius: 12px; border: 1px solid rgba(124, 58, 237, 0.2); background: var(--input-bg); font-size: 14px; color: var(--text-charcoal); outline: none; }
-    .form-input:focus { border-color: var(--violet-primary); box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15); }
+    /* Matter.js 2D Physics Canvas Container */
+    .physics-sandbox-box {
+      border-radius: 20px;
+      border: 1px solid var(--st-border);
+      background: var(--base-tint);
+      position: relative;
+      overflow: hidden;
+      height: 380px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: var(--shadow-atelier);
+    }
+    .physics-canvas-header {
+      position: absolute;
+      top: 18px; left: 24px; right: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .physics-canvas-title {
+      font-family: var(--_font-mono);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--color-bronze);
+      font-weight: 600;
+    }
+    #matterCanvas { width: 100%; height: 100%; }
 
-    .pill-input-box { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; border-radius: 12px; border: 1px solid rgba(124, 58, 237, 0.2); background: var(--input-bg); min-height: 48px; }
-    .tag-pill { background: linear-gradient(135deg, var(--violet-primary), var(--magenta-glow)); color: #fff; padding: 4px 12px; border-radius: 16px; font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 6px; }
-    .tag-pill span { cursor: pointer; opacity: 0.8; }
+    /* Hero KPI Metrics Ticker */
+    .kpi-ticker-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+    }
+    .kpi-card { padding: 24px; }
+    .kpi-number {
+      font-family: var(--_font-mono);
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--color-bronze);
+    }
+    .kpi-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--t-muted);
+      margin-top: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
 
-    /* Dropzone Upload */
-    .dropzone-box { border: 2px dashed rgba(124, 58, 237, 0.4); border-radius: 16px; padding: 24px; text-align: center; cursor: pointer; background: rgba(124, 58, 237, 0.04); transition: border 0.2s; }
-    .dropzone-box:hover { border-color: var(--violet-primary); background: rgba(124, 58, 237, 0.08); }
-    .img-preview-thumb { width: 100%; max-height: 180px; object-fit: cover; border-radius: 12px; margin-top: 12px; }
+    /* TAB 1: MULTIMODAL SANDBOX */
+    .sandbox-split-grid {
+      display: grid;
+      grid-template-columns: 1fr 400px;
+      height: 100%;
+      overflow: hidden;
+    }
+    .chat-column { display: flex; flex-direction: column; height: 100%; padding: 28px; background: rgba(247, 245, 240, 0.4); }
+    .chat-stream-box { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding-right: 12px; }
+    .msg-card {
+      max-width: 75%;
+      padding: 16px 22px;
+      border-radius: 18px;
+      font-size: 14.5px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+    .msg-card.user {
+      align-self: flex-end;
+      background: var(--chat-user-bg);
+      color: #FFFFFF;
+      border-bottom-right-radius: 4px;
+      box-shadow: 0 10px 24px -6px rgba(194, 155, 56, 0.35);
+    }
+    .msg-card.ai {
+      align-self: flex-start;
+      background: var(--chat-ai-bg);
+      color: var(--t-bright);
+      border-bottom-left-radius: 4px;
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--shadow-atelier);
+    }
 
-    /* AI Auto-Fill Button */
-    .ai-autofill-btn { background: rgba(168, 85, 247, 0.15); border: 1px solid var(--violet-primary); color: var(--violet-primary); padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; }
-    .ai-autofill-btn:hover { background: var(--violet-primary); color: #fff; }
+    .floating-dock {
+      background: var(--glass-surface);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--st-border);
+      border-radius: 20px;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 16px;
+      box-shadow: var(--shadow-atelier);
+    }
+    .dock-input-field {
+      flex: 1;
+      border: none;
+      background: transparent;
+      outline: none;
+      font-size: 15px;
+      color: var(--t-bright);
+    }
+    .dock-action-btn {
+      background: transparent;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      padding: 8px;
+      border-radius: 10px;
+      transition: transform 0.2s;
+    }
+    .dock-action-btn:hover { transform: scale(1.15); }
+    .dock-action-btn.recording { animation: pulseRec 1s infinite; color: var(--color-rose); }
 
-    /* Multimodal Playground */
-    .playground-grid { display: grid; grid-template-columns: 1fr 380px; width: 100%; height: 100%; overflow: hidden; }
-    .chat-pane { display: flex; flex-direction: column; height: 100%; padding: 24px; }
-    .chat-stream { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding-right: 12px; }
+    @keyframes pulseRec { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
 
-    .msg-bubble { max-width: 75%; padding: 14px 20px; border-radius: 18px; font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
-    .msg-bubble.user { align-self: flex-end; background: linear-gradient(135deg, var(--violet-primary), var(--indigo-aura)); color: #fff; border-bottom-right-radius: 4px; box-shadow: 0 10px 20px -5px rgba(124, 58, 237, 0.3); }
-    .msg-bubble.ai { align-self: flex-start; background: var(--msg-ai-bg); color: var(--text-charcoal); border-bottom-left-radius: 4px; border: 1px solid var(--glass-border); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); }
+    .inspector-column {
+      border-left: 1px solid var(--st-border-subtle);
+      background: var(--telemetry-bg);
+      backdrop-filter: blur(20px);
+      padding: 28px;
+      overflow-y: auto;
+    }
+    .code-terminal {
+      background: #11100E;
+      color: #E6C675;
+      padding: 14px;
+      border-radius: 12px;
+      font-family: var(--_font-mono);
+      font-size: 12px;
+      overflow-x: auto;
+      margin-top: 10px;
+      border: 1px solid rgba(194, 155, 56, 0.2);
+    }
 
-    .action-dock { background: var(--glass-surface); backdrop-filter: blur(16px); border: 1px solid var(--glass-border); border-radius: 20px; padding: 12px 18px; display: flex; align-items: center; gap: 12px; margin-top: 16px; box-shadow: var(--shadow-glass); }
-    .dock-input { flex: 1; border: none; background: transparent; outline: none; font-size: 15px; color: var(--text-charcoal); }
-    .dock-btn { background: transparent; border: none; font-size: 20px; cursor: pointer; padding: 8px; border-radius: 10px; }
+    /* TAB 2: PRODUCT ONBOARDING */
+    .onboard-page-wrap { padding: 36px 48px; width: 100%; max-width: 1440px; margin: 0 auto; }
+    .onboard-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-top: 24px; }
+    .form-input-field {
+      width: 100%;
+      padding: 14px 18px;
+      border-radius: 12px;
+      border: 1px solid var(--st-border);
+      background: var(--input-bg);
+      font-size: 14.5px;
+      color: var(--t-bright);
+      outline: none;
+      transition: border 0.2s;
+    }
+    .form-input-field:focus {
+      border-color: var(--color-bronze);
+      box-shadow: 0 0 0 3px rgba(194, 155, 56, 0.15);
+    }
+    .tag-pill-item {
+      background: linear-gradient(135deg, var(--color-bronze), var(--color-terracotta));
+      color: #FFFFFF;
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tag-pill-item span { cursor: pointer; opacity: 0.85; }
+
+    .btn-ai-autofill {
+      background: rgba(194, 155, 56, 0.15);
+      border: 1px solid var(--color-bronze);
+      color: var(--color-bronze);
+      padding: 9px 18px;
+      border-radius: 10px;
+      font-size: 12.5px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      transition: all 0.2s;
+    }
+    .btn-ai-autofill:hover {
+      background: var(--color-bronze);
+      color: #FFFFFF;
+    }
 
     /* Product Grid */
-    .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; margin-top: 24px; }
-    .product-card { padding: 20px; }
-
-    .telemetry-pane { border-left: 1px solid var(--glass-border); background: var(--telemetry-bg); backdrop-filter: blur(16px); padding: 24px; overflow-y: auto; }
-    .code-box { background: #0F172A; color: #38BDF8; padding: 12px; border-radius: 10px; font-family: monospace; font-size: 12px; overflow-x: auto; margin-top: 8px; }
+    .catalog-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+      gap: 24px;
+      margin-top: 32px;
+    }
+    .catalog-item-card { padding: 22px; }
   </style>
 </head>
 <body>
-  <!-- Sidebar -->
+  <!-- Custom Kinetic Cursor Elements -->
+  <div class="mxd-cursor-dot" id="cursorDot"></div>
+  <div class="mxd-cursor-aura" id="cursorAura"></div>
+
+  <!-- Sidebar Navigation -->
   <div class="sidebar">
     <div>
-      <div class="brand-title">AROMATESE ✦</div>
+      <div class="brand-box" onclick="switchTab('hero')">
+        <div class="brand-title">CHATNAB ✦</div>
+      </div>
       <ul class="nav-list">
-        <li class="nav-item active" onclick="switchTab('playground')">🧪 Multimodal Sandbox</li>
+        <li class="nav-item active" onclick="switchTab('hero')">🏛️ Overview & Physics</li>
+        <li class="nav-item" onclick="switchTab('playground')">🧪 Multimodal Sandbox</li>
         <li class="nav-item" onclick="switchTab('onboarding')">🛍️ Product Onboarding</li>
-        <li class="nav-item" onclick="switchTab('live-chats')">💬 Live Chats & HITL</li>
+        <li class="nav-item" onclick="switchTab('live-chats')">💬 Live HITL Stream</li>
       </ul>
     </div>
-    <div style="font-size: 12px; color: var(--text-slate);">
-      DB: <strong>Mattic Supabase</strong> (pgvector)<br>
-      Model: <strong>Gemini 2.0 Flash</strong>
+    <div style="font-size: 12px; color: var(--t-muted); font-family: var(--_font-mono);">
+      Ground: <strong>Travertine Atelier</strong><br>
+      Model: <strong>Gemini 2.0 Flash</strong><br>
+      DB: <strong>Mattic Supabase</strong>
     </div>
   </div>
 
-  <!-- Main Workspace -->
-  <div class="main-workspace">
-    <div class="top-header">
-      <div class="pill-badge">
-        <span style="width: 8px; height: 8px; background: #10B981; border-radius: 50%;"></span>
-        Live Gemini Multimodal & Grounding Engine Active
+  <!-- Main Workspace Shell -->
+  <div class="workspace-shell">
+    <div class="top-bar">
+      <div class="telemetry-pill">
+        <span style="width: 8px; height: 8px; background: var(--color-emerald); border-radius: 50%;"></span>
+        ChatNab Kinetic Core Active • Zero-Hallucination Gate
       </div>
-      <div class="header-actions">
-        <button class="theme-toggle-btn" id="themeBtn" onclick="toggleTheme()">☀️ Light Mode</button>
-        <button style="background: #EF4444; color: #fff; border: none; padding: 8px 16px; border-radius: 10px; font-weight: 600; cursor: pointer;" onclick="toggleGlobalKillSwitch()">HALT AI (KILL SWITCH)</button>
+      <div class="action-group">
+        <button class="btn-theme" id="themeToggleBtn" onclick="toggleAtelierTheme()">☀️ Travertine Mode</button>
+        <button class="btn-kill" onclick="toggleGlobalKillSwitch()">HALT AI (KILL SWITCH)</button>
       </div>
     </div>
 
-    <!-- TAB 1: MULTIMODAL SANDBOX & TELEMETRY -->
-    <div class="tab-pane active" id="tab-playground">
-      <div class="playground-grid">
-        <div class="chat-pane">
-          <div class="chat-stream" id="chatStream">
-            <div class="msg-bubble ai">
-              <strong>Assalamu Alaikum!</strong> I am your Aromatese AI Sales Consultant.<br>
-              Try asking: <em>"Bhai ekta holud jama kinte chai"</em> or record a voice note using the mic below! 🎤
-            </div>
-          </div>
-
-          <div class="action-dock">
-            <button class="dock-btn" id="micBtn" onclick="toggleAudioRecording()" title="Record Voice Note">🎙️</button>
-            <button class="dock-btn" onclick="document.getElementById('imageUploader').click()" title="Attach Photo">📷</button>
-            <input type="file" id="imageUploader" accept="image/*" style="display:none" onchange="handleImageUpload(event)">
-
-            <input type="text" class="dock-input" id="chatInput" placeholder="Type message in Banglish, Bangla, or English..." onkeydown="if(event.key==='Enter') sendChatMessage()">
-            <button class="dock-btn" style="color: var(--violet-primary);" onclick="sendChatMessage()">➔</button>
+    <!-- TAB 0: KINETIC HERO & MATTER.JS 2D PHYSICS SHOWCASE -->
+    <div class="tab-viewport active" id="tab-hero">
+      <div class="hero-section">
+        <div class="hero-headline-wrap">
+          <div class="hero-eyebrow">✦ Autonomous Conversational Commerce</div>
+          <h1 class="hero-title">High-Velocity Multimodal AI for <em>Next-Generation Retail</em></h1>
+          <p class="hero-subtitle">
+            ChatNab connects directly to your Meta Cloud APIs, live Supabase pgvector catalog, and Gemini multimodal audio/vision perception to convert inquiries into paid orders in Bengali, English, and Banglish.
+          </p>
+          <div class="hero-cta-row">
+            <button class="btn-kinetic-primary" onclick="switchTab('playground')">Launch AI Sandbox ➔</button>
+            <button class="btn-theme" style="padding: 14px 24px; font-size: 15px;" onclick="switchTab('onboarding')">Onboard Products & Media</button>
           </div>
         </div>
 
-        <div class="telemetry-pane">
-          <h3 style="font-size: 16px; font-weight: 700; color: var(--violet-deep); margin-bottom: 16px;">⚡ Grounding Telemetry Inspector</h3>
-          <div class="glass-card" style="padding: 16px; margin-bottom: 16px;">
+        <!-- Matter.js 2D Rigid-Body Physics Canvas -->
+        <div class="physics-sandbox-box">
+          <div class="physics-canvas-header">
+            <span class="physics-canvas-title">✦ Matter.js 2D Kinetic Gravity Token Sandbox (Drag & Throw)</span>
+            <span style="font-family: var(--_font-mono); font-size: 11px; color: var(--t-muted);">Elastic Restitution: 0.85</span>
+          </div>
+          <div id="matterCanvas"></div>
+        </div>
+
+        <!-- Live KPI Telemetry Metrics Ticker -->
+        <div class="kpi-ticker-grid">
+          <div class="atelier-card kpi-card">
+            <div class="kpi-number" id="kpiLatency">< 420 ms</div>
+            <div class="kpi-label">Sub-Second Processing</div>
+          </div>
+          <div class="atelier-card kpi-card">
+            <div class="kpi-number">100 %</div>
+            <div class="kpi-label">Grounded Anti-Hallucination</div>
+          </div>
+          <div class="atelier-card kpi-card">
+            <div class="kpi-number">3 Channels</div>
+            <div class="kpi-label">WhatsApp, IG & Messenger</div>
+          </div>
+          <div class="atelier-card kpi-card">
+            <div class="kpi-number">pgvector</div>
+            <div class="kpi-label">Visual & Text Embeddings</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 1: MULTIMODAL SANDBOX (VOICE + PHOTO + CHAT) -->
+    <div class="tab-viewport" id="tab-playground">
+      <div class="sandbox-split-grid">
+        <div class="chat-column">
+          <div class="chat-stream-box" id="chatStream">
+            <div class="msg-card ai">
+              <strong>Assalamu Alaikum!</strong> I am your ChatNab AI Sales Consultant.<br>
+              Try asking: <em>"bhai ghori kinbo kono ghori ase?"</em> or click the mic to record a voice note! 🎙️
+            </div>
+          </div>
+
+          <!-- Floating Action Dock -->
+          <div class="floating-dock">
+            <button class="dock-action-btn" id="micBtn" onclick="toggleAudioRecording()" title="Record Voice Note">🎙️</button>
+            <button class="dock-action-btn" onclick="document.getElementById('imageUploader').click()" title="Attach Photo">📷</button>
+            <input type="file" id="imageUploader" accept="image/*" style="display:none" onchange="handleImageUpload(event)">
+
+            <input type="text" class="dock-input-field" id="chatInput" placeholder="Type message in Banglish, Bangla, or English..." onkeydown="if(event.key==='Enter') sendChatMessage()">
+            <button class="dock-action-btn" style="color: var(--color-bronze);" onclick="sendChatMessage()">➔</button>
+          </div>
+        </div>
+
+        <!-- Telemetry Inspector Column -->
+        <div class="inspector-column">
+          <h3 style="font-size: 16px; font-weight: 700; color: var(--color-bronze); margin-bottom: 18px; font-family: var(--_font-display);">⚡ Grounding Telemetry Inspector</h3>
+          <div class="atelier-card" style="padding: 18px; margin-bottom: 16px;">
             <strong style="font-size: 13px;">Execution Latency:</strong>
-            <div style="font-size: 20px; font-weight: 700; color: var(--violet-primary);" id="latencyVal">420 ms</div>
+            <div style="font-size: 22px; font-weight: 700; color: var(--color-bronze); font-family: var(--_font-mono);" id="latencyVal">420 ms</div>
           </div>
-          <div class="glass-card" style="padding: 16px; margin-bottom: 16px;">
+          <div class="atelier-card" style="padding: 18px; margin-bottom: 16px;">
             <strong style="font-size: 13px;">Response Validator Gate:</strong>
-            <div style="color: #10B981; font-weight: 600; margin-top: 4px;" id="validatorStatus">✓ PASSED (0 Hallucinations)</div>
+            <div style="color: var(--color-emerald); font-weight: 600; margin-top: 4px;" id="validatorStatus">✓ PASSED (0 Hallucinations)</div>
           </div>
-          <div class="glass-card" style="padding: 16px;">
+          <div class="atelier-card" style="padding: 18px;">
             <strong style="font-size: 13px;">Grounded DB Tool Proof:</strong>
-            <div class="code-box" id="telemetryProof">
+            <div class="code-terminal" id="telemetryProof">
 {
   "tool": "query_catalog",
-  "matchedSku": "DRESS-YELLOW-HOLUD",
-  "priceBdt": 2200,
-  "stock": 6
+  "matchedSku": "WATCH-OMEGA-SEAMASTER",
+  "priceBdt": 38500,
+  "stock": 2
 }
             </div>
           </div>
@@ -477,160 +945,309 @@ app.get('/admin', (req: Request, res: Response) => {
       </div>
     </div>
 
-    <!-- TAB 2: PRODUCT ONBOARDING & MANAGEMENT -->
-    <div class="tab-pane" id="tab-onboarding">
-      <div class="onboarding-container">
-        <div class="onboard-top-bar">
+    <!-- TAB 2: PRODUCT ONBOARDING -->
+    <div class="tab-viewport" id="tab-onboarding">
+      <div class="onboard-page-wrap">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
           <div>
-            <h2>Product Catalog & AI Media Onboarding</h2>
-            <p style="color: var(--text-slate); font-size: 14px;">Upload product photos, voice synonyms, and let Gemini auto-complete Bangla & tags!</p>
+            <h2 style="font-family: var(--_font-display); font-size: 28px;">Product Catalog & Media Onboarding</h2>
+            <p style="color: var(--t-muted); font-size: 14px; margin-top: 4px;">Upload multiple photos, voice tags, and let Gemini auto-complete Bangla, Banglish & attributes.</p>
           </div>
-          <button class="btn-primary" onclick="toggleOnboardingForm()">+ Onboard New Product</button>
+          <button class="btn-kinetic-primary" onclick="toggleOnboardingForm()">+ Onboard New Product</button>
         </div>
 
-        <!-- Onboarding Form (Collapsible / Toggleable) -->
-        <div id="onboardingFormWrapper" style="display: none; margin-bottom: 32px;">
-          <div class="onboarding-grid">
-            <!-- Left Column: Core Metadata & Image Dropzone -->
-            <div class="glass-card" style="padding: 28px;">
-              <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; color: var(--violet-deep);">Product Core Metadata & Photo</h3>
+        <!-- Collapsible Onboarding Form -->
+        <div id="onboardingFormWrapper" style="display: none; margin-top: 28px;">
+          <div class="onboard-form-grid">
+            <!-- Left Column: Core Metadata & Photos -->
+            <div class="atelier-card" style="padding: 32px;">
+              <h3 style="font-family: var(--_font-display); font-size: 18px; margin-bottom: 20px; color: var(--color-bronze);">Product Metadata & Visual Media</h3>
               
               <!-- Multi-Photo Dropzone Upload -->
-              <div class="dropzone-box" onclick="document.getElementById('obImageFiles').click()">
-                <div style="font-size: 28px;">📷</div>
-                <div style="font-size: 13px; font-weight: 600; margin-top: 6px; color: var(--violet-primary);">Click or Drag Multiple Product Photos to Upload</div>
-                <div style="font-size: 11px; color: var(--text-slate);">Generates pgvector Image Embeddings automatically for all assets</div>
+              <div style="border: 2px dashed var(--st-border); border-radius: 16px; padding: 24px; text-align: center; cursor: pointer; background: var(--base-tint);" onclick="document.getElementById('obImageFiles').click()">
+                <div style="font-size: 32px;">📷</div>
+                <div style="font-size: 14px; font-weight: 700; margin-top: 6px; color: var(--color-bronze);">Click or Drag Multiple Product Photos</div>
+                <div style="font-size: 11px; color: var(--t-muted);">Generates pgvector image embeddings automatically</div>
                 <input type="file" id="obImageFiles" accept="image/*" multiple style="display:none" onchange="previewProductImages(event)">
                 <div id="imgPreviewGrid" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:12px;"></div>
               </div>
 
-              <div class="form-group" style="margin-top: 18px;">
-                <label class="form-label">Title (English)</label>
-                <input type="text" class="form-input" id="obTitleEn" placeholder="e.g. Royal Navy Blue Silk Saree">
-                <button class="ai-autofill-btn" onclick="triggerAiAutoFill()">✨ AI Auto-Complete (Bangla, Banglish, Tags & Notes)</button>
+              <div style="margin-top: 20px;">
+                <label style="display:block; font-size:13px; font-weight:600; color:var(--t-medium); margin-bottom:6px;">Title (English)</label>
+                <input type="text" class="form-input-field" id="obTitleEn" placeholder="e.g. Omega Seamaster Blue Watch Tourbillon">
+                <button class="btn-ai-autofill" onclick="triggerAiAutoFill()">✨ AI Auto-Complete (Bangla, Banglish, Tags & Notes)</button>
               </div>
 
-              <div class="form-group">
-                <label class="form-label">Title (Native Bengali)</label>
-                <input type="text" class="form-input" id="obTitleBn" placeholder="Auto-completes from English title...">
+              <div style="margin-top: 16px;">
+                <label style="display:block; font-size:13px; font-weight:600; color:var(--t-medium); margin-bottom:6px;">Title (Native Bengali)</label>
+                <input type="text" class="form-input-field" id="obTitleBn" placeholder="Auto-completes from English title...">
               </div>
-              <div class="form-group">
-                <label class="form-label">Title (Banglish Transliteration)</label>
-                <input type="text" class="form-input" id="obTitleBanglish" placeholder="Auto-completes from English title...">
+              <div style="margin-top: 16px;">
+                <label style="display:block; font-size:13px; font-weight:600; color:var(--t-medium); margin-bottom:6px;">Title (Banglish Transliteration)</label>
+                <input type="text" class="form-input-field" id="obTitleBanglish" placeholder="Auto-completes from English title...">
               </div>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                <div class="form-group">
-                  <label class="form-label">Base Price (BDT)</label>
-                  <input type="number" class="form-input" id="obPrice" placeholder="2500">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 16px;">
+                <div>
+                  <label style="display:block; font-size:13px; font-weight:600; color:var(--t-medium); margin-bottom:6px;">Base Price (BDT)</label>
+                  <input type="number" class="form-input-field" id="obPrice" placeholder="2500">
                 </div>
-                <div class="form-group">
-                  <label class="form-label">Discount Price (BDT)</label>
-                  <input type="number" class="form-input" id="obDiscount" placeholder="2200">
+                <div>
+                  <label style="display:block; font-size:13px; font-weight:600; color:var(--t-medium); margin-bottom:6px;">Discount Price (BDT)</label>
+                  <input type="number" class="form-input-field" id="obDiscount" placeholder="2200">
                 </div>
               </div>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                <div class="form-group">
-                  <label class="form-label">Stock Quantity</label>
-                  <input type="number" class="form-input" id="obStock" placeholder="6">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 16px;">
+                <div>
+                  <label style="display:block; font-size:13px; font-weight:600; color:var(--t-medium); margin-bottom:6px;">Stock Quantity</label>
+                  <input type="number" class="form-input-field" id="obStock" placeholder="6">
                 </div>
-                <div class="form-group">
-                  <label class="form-label">Brand Name</label>
-                  <input type="text" class="form-input" id="obBrand" placeholder="Aromatese Exclusive">
+                <div>
+                  <label style="display:block; font-size:13px; font-weight:600; color:var(--t-medium); margin-bottom:6px;">Brand Name</label>
+                  <input type="text" class="form-input-field" id="obBrand" placeholder="ChatNab Atelier">
                 </div>
               </div>
             </div>
 
-            <!-- Right Column: Voice Tags & AI Attribute Picks -->
-            <div class="glass-card" style="padding: 28px;">
-              <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; color: var(--violet-deep);">Voice Tags & AI Extracted Attributes</h3>
+            <!-- Right Column: Voice Tags & Attributes -->
+            <div class="atelier-card" style="padding: 32px;">
+              <h3 style="font-family: var(--_font-display); font-size: 18px; margin-bottom: 20px; color: var(--color-bronze);">Voice Tags & AI Extracted Attributes</h3>
 
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px;">
                 <div>
-                  <span style="font-size: 11px; font-weight: 600; color: var(--text-slate);">Extracted Color:</span>
-                  <div style="font-size: 13px; font-weight: 700; color: var(--violet-primary);" id="attrColor">Auto-extracted</div>
+                  <span style="font-size: 11px; font-weight: 600; color: var(--t-muted);">Extracted Color:</span>
+                  <div style="font-size: 14px; font-weight: 700; color: var(--color-bronze);" id="attrColor">Auto-extracted</div>
                 </div>
                 <div>
-                  <span style="font-size: 11px; font-weight: 600; color: var(--text-slate);">Extracted Material:</span>
-                  <div style="font-size: 13px; font-weight: 700; color: var(--violet-primary);" id="attrMaterial">Auto-extracted</div>
+                  <span style="font-size: 11px; font-weight: 600; color: var(--t-muted);">Extracted Material:</span>
+                  <div style="font-size: 14px; font-weight: 700; color: var(--color-bronze);" id="attrMaterial">Auto-extracted</div>
                 </div>
               </div>
 
-              <div class="form-group">
-                <label class="form-label">Dynamic Voice Synonyms & Colloquial Tags (Auto-Populated)</label>
-                <div class="pill-input-box" id="tagPillBox">
-                  <input type="text" style="border:none; outline:none; background:transparent; font-size:14px; flex:1;" id="tagInput" placeholder="Add tag (e.g. holud, bashanti)..." onkeydown="if(event.key==='Enter') addVoiceTag()">
+              <div>
+                <label style="display:block; font-size:13px; font-weight:600; color:var(--t-medium); margin-bottom:6px;">Voice Synonyms & Colloquial Tags (Auto-Populated)</label>
+                <div style="display:flex; flex-wrap:wrap; gap:8px; padding:10px; border-radius:12px; border:1px solid var(--st-border); background:var(--input-bg); min-height:48px;" id="tagPillBox">
+                  <input type="text" style="border:none; outline:none; background:transparent; font-size:14px; flex:1; color:var(--t-bright);" id="tagInput" placeholder="Add tag (e.g. ghori, watch)..." onkeydown="if(event.key==='Enter') addVoiceTag()">
                 </div>
               </div>
 
-              <div class="form-group">
-                <label class="form-label">Custom Sales Notes / Prompts</label>
-                <textarea class="form-input" id="obNotes" rows="3" placeholder="AI auto-generates selling highlights here..."></textarea>
+              <div style="margin-top: 18px;">
+                <label style="display:block; font-size:13px; font-weight:600; color:var(--t-medium); margin-bottom:6px;">Custom Sales Notes / Prompts</label>
+                <textarea class="form-input-field" id="obNotes" rows="3" placeholder="AI auto-generates tailored selling highlights here..."></textarea>
               </div>
 
-              <div class="glass-card" style="padding: 16px; background: rgba(124,58,237,0.05); margin-top: 16px;">
-                <strong style="font-size: 13px;">pgvector Embedding Sync:</strong>
+              <div class="atelier-card" style="padding: 16px; background: var(--base-tint); margin-top: 20px;">
+                <strong style="font-size: 13px;">Vector Indexing Status:</strong>
                 <div style="display: flex; gap: 12px; margin-top: 8px;">
-                  <span class="tag-pill" style="background: #10B981;">text-embedding-004: Synced</span>
-                  <span class="tag-pill" style="background: var(--violet-primary);">image_embedding: Active</span>
+                  <span class="tag-pill-item" style="background: var(--color-emerald);">text-embedding-004: Synced</span>
+                  <span class="tag-pill-item">image_embedding: Active</span>
                 </div>
               </div>
 
-              <button class="btn-primary" style="width: 100%; margin-top: 24px; padding: 14px; justify-content: center;" onclick="submitOnboardingForm()">Save Product & Sync Embeddings ➔</button>
+              <button class="btn-kinetic-primary" style="width: 100%; margin-top: 24px; padding: 14px; justify-content: center;" onclick="submitOnboardingForm()">Save Product & Sync Embeddings ➔</button>
             </div>
           </div>
         </div>
 
         <!-- Catalog Product Grid -->
-        <div class="product-grid" id="productGrid"></div>
+        <div class="catalog-cards-grid" id="productGrid"></div>
+      </div>
+    </div>
+
+    <!-- TAB 3: LIVE CONVERSATIONS & HITL -->
+    <div class="tab-viewport" id="tab-live-chats">
+      <div style="padding: 36px 48px;">
+        <h2 style="font-family: var(--_font-display); font-size: 28px;">Live Omnichannel Conversations & Human Takeover</h2>
+        <p style="color: var(--t-muted); font-size: 14px; margin-top: 4px;">Supervise active customer threads across WhatsApp, Messenger, and Instagram.</p>
+        <div class="atelier-card" style="margin-top: 24px; padding: 24px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--st-border-subtle); padding-bottom: 16px;">
+            <div>
+              <strong style="font-size: 16px;">Rahim Chowdhury</strong>
+              <span style="font-size: 12px; color: var(--t-muted); margin-left: 12px;">01712345678 • WhatsApp Business</span>
+            </div>
+            <button class="btn-theme" onclick="alert('Staff takeover active. AI is muted on this thread.')">Take Over Chat (Mute AI)</button>
+          </div>
+          <div style="padding-top: 16px; font-size: 14px; line-height: 1.6;">
+            <strong>Latest Query:</strong> "Ami ekta holud jama kinte chai"<br>
+            <span style="color: var(--color-emerald); font-weight: 600;">Grounded Response Sent:</span> "Haa, amader kache Bashanti Yellow Floral Dress ache! Price: 2200 BDT..."
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
   <script>
-    let activeVoiceTags = ['holud', 'yellow', 'bashanti', 'jama', 'frock'];
-    let uploadedImageBase64 = '';
-    let currentTheme = localStorage.getItem('aromatese_theme') || 'light';
+    let activeVoiceTags = ['ghori', 'watch', 'neel', 'blue', 'omega', 'seamaster'];
+    let uploadedImageBase64s = [];
+    let currentTheme = localStorage.getItem('chatnab_theme') || 'light';
+
+    // 1. Lenis Smooth Scrolling Engine
+    const lenis = new Lenis({ duration: 1.2, easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)) });
+    function raf(time) {
+      lenis.raf(time);
+      requestAnimationFrame(raf);
+    }
+    requestAnimationFrame(raf);
+
+    // 2. Custom Kinetic Cursor
+    const dot = document.getElementById('cursorDot');
+    const aura = document.getElementById('cursorAura');
+    window.addEventListener('mousemove', (e) => {
+      dot.style.left = \`\${e.clientX}px\`;
+      dot.style.top = \`\${e.clientY}px\`;
+      gsap.to(aura, { x: e.clientX, y: e.clientY, duration: 0.25, ease: 'power2.out' });
+    });
+
+    // 3. Matter.js 2D Rigid-Body Physics Sandbox
+    function initMatterPhysics() {
+      const container = document.getElementById('matterCanvas');
+      if (!container) return;
+      container.innerHTML = '';
+
+      const { Engine, Render, Runner, Bodies, Composite, Mouse, MouseConstraint, Events } = Matter;
+      const engine = Engine.create();
+      engine.world.gravity.y = 0.9;
+
+      const width = container.clientWidth || 800;
+      const height = container.clientHeight || 380;
+
+      const render = Render.create({
+        element: container,
+        engine: engine,
+        options: {
+          width: width,
+          height: height,
+          wireframes: false,
+          background: 'transparent',
+        }
+      });
+
+      Render.run(render);
+      const runner = Runner.create();
+      Runner.run(runner, engine);
+
+      // Boundaries
+      const wallOptions = { isStatic: true, render: { visible: false } };
+      Composite.add(engine.world, [
+        Bodies.rectangle(width / 2, height + 30, width * 2, 60, wallOptions),
+        Bodies.rectangle(-30, height / 2, 60, height * 2, wallOptions),
+        Bodies.rectangle(width + 30, height / 2, 60, height * 2, wallOptions),
+      ]);
+
+      // Feature Physics Tags
+      const tags = [
+        "✦ Omnichannel AI", "Bangla Voice NLP", "pgvector Vision",
+        "Zero Hallucination", "COD Automation", "WhatsApp Cloud API",
+        "15-Min Stock Lock", "Meta Messenger", "Instagram DMs"
+      ];
+
+      tags.forEach((text, i) => {
+        const x = 100 + (i % 3) * 180 + Math.random() * 40;
+        const y = -20 - i * 60;
+        const pill = Bodies.rectangle(x, y, 160, 44, {
+          chamfer: { radius: 22 },
+          restitution: 0.82,
+          friction: 0.1,
+          render: {
+            fillStyle: i % 2 === 0 ? '#C29B38' : '#C85A32',
+            strokeStyle: '#FFFFFF',
+            lineWidth: 2,
+          }
+        });
+        Composite.add(engine.world, pill);
+      });
+
+      // Mouse Interaction
+      const mouse = Mouse.create(render.canvas);
+      const mouseConstraint = MouseConstraint.create(engine, {
+        mouse: mouse,
+        constraint: { stiffness: 0.2, render: { visible: false } }
+      });
+      Composite.add(engine.world, mouseConstraint);
+      render.mouse = mouse;
+
+      // Custom Tag Text Drawing on Matter.js Canvas
+      Events.on(render, 'afterRender', () => {
+        const ctx = render.context;
+        ctx.font = '600 12px "Manrope", sans-serif';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        const bodies = Composite.allBodies(engine.world);
+        let tagIndex = 0;
+        bodies.forEach(body => {
+          if (!body.isStatic && tagIndex < tags.length) {
+            ctx.save();
+            ctx.translate(body.position.x, body.position.y);
+            ctx.rotate(body.angle);
+            ctx.fillText(tags[tagIndex], 0, 0);
+            ctx.restore();
+            tagIndex++;
+          }
+        });
+      });
+    }
 
     function applyTheme(theme) {
       document.documentElement.setAttribute('data-theme', theme);
-      const btn = document.getElementById('themeBtn');
-      if (btn) btn.innerHTML = theme === 'dark' ? '🌙 Dark Mode' : '☀️ Light Mode';
-      localStorage.setItem('aromatese_theme', theme);
+      const btn = document.getElementById('themeToggleBtn');
+      if (btn) btn.innerHTML = theme === 'dark' ? '🌙 Obsidian Mode' : '☀️ Travertine Mode';
+      localStorage.setItem('chatnab_theme', theme);
     }
 
-    function toggleTheme() {
+    function toggleAtelierTheme() {
       currentTheme = currentTheme === 'light' ? 'dark' : 'light';
       applyTheme(currentTheme);
     }
 
+    function switchTab(tabName) {
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-viewport').forEach(el => el.classList.remove('active'));
+
+      document.getElementById(\`tab-\${tabName}\`).classList.add('active');
+      if (tabName === 'hero') setTimeout(initMatterPhysics, 100);
+      if (tabName === 'onboarding') loadProducts();
+      gsap.from(\`#tab-\${tabName} .atelier-card\`, { y: 20, opacity: 0, duration: 0.5, stagger: 0.05, ease: 'power2.out' });
+    }
+
     function toggleOnboardingForm() {
       const wrapper = document.getElementById('onboardingFormWrapper');
-      if (wrapper.style.display === 'none') {
-        wrapper.style.display = 'block';
-        gsap.from('#onboardingFormWrapper .glass-card', { y: 20, opacity: 0, duration: 0.5, stagger: 0.1 });
-      } else {
-        wrapper.style.display = 'none';
+      wrapper.style.display = wrapper.style.display === 'none' ? 'block' : 'none';
+      if (wrapper.style.display === 'block') {
+        gsap.from('#onboardingFormWrapper .atelier-card', { y: 24, opacity: 0, duration: 0.5, stagger: 0.08 });
       }
     }
 
-    function previewProductImage(evt) {
-      const file = evt.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = e => {
-        uploadedImageBase64 = e.target.result;
-        const img = document.getElementById('imgPreview');
-        img.src = uploadedImageBase64;
-        img.style.display = 'block';
-      };
-      reader.readAsDataURL(file);
+    function previewProductImages(evt) {
+      const files = Array.from(evt.target.files);
+      if (!files || files.length === 0) return;
+      uploadedImageBase64s = [];
+      const grid = document.getElementById('imgPreviewGrid');
+      grid.innerHTML = '';
+
+      files.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = e => {
+          const b64 = e.target.result;
+          uploadedImageBase64s.push(b64);
+          const img = document.createElement('img');
+          img.src = b64;
+          img.style.width = '70px';
+          img.style.height = '70px';
+          img.style.objectFit = 'cover';
+          img.style.borderRadius = '8px';
+          img.style.border = '1px solid var(--color-bronze)';
+          grid.appendChild(img);
+        };
+        reader.readAsDataURL(file);
+      });
     }
 
     async function triggerAiAutoFill() {
       const titleEn = document.getElementById('obTitleEn').value.trim();
       if (!titleEn) return alert('Please enter an English title first.');
 
-      const btn = document.querySelector('.ai-autofill-btn');
+      const btn = document.querySelector('.btn-ai-autofill');
       btn.innerText = '✨ Gemini AI Thinking...';
 
       try {
@@ -668,11 +1285,11 @@ app.get('/admin', (req: Request, res: Response) => {
     function renderTags() {
       const box = document.getElementById('tagPillBox');
       const input = document.getElementById('tagInput');
-      box.querySelectorAll('.tag-pill').forEach(el => el.remove());
+      box.querySelectorAll('.tag-pill-item').forEach(el => el.remove());
 
       activeVoiceTags.forEach(t => {
         const pill = document.createElement('div');
-        pill.className = 'tag-pill';
+        pill.className = 'tag-pill-item';
         pill.innerHTML = \`\${t} <span onclick="removeVoiceTag('\${t}')">×</span>\`;
         box.insertBefore(pill, input);
       });
@@ -693,39 +1310,9 @@ app.get('/admin', (req: Request, res: Response) => {
       renderTags();
     }
 
-    function switchTab(tabName) {
-      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-      document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
-
-      document.getElementById(\`tab-\${tabName}\`).classList.add('active');
-      if (tabName === 'onboarding') loadProducts();
-      gsap.from(\`#tab-\${tabName} .glass-card\`, { y: 20, opacity: 0, duration: 0.5, stagger: 0.05 });
-    }
-
-    async function loadProducts() {
-      const res = await fetch('/api/admin/products');
-      const data = await res.json();
-      const grid = document.getElementById('productGrid');
-
-      grid.innerHTML = data.products.map(p => \`
-        <div class="glass-card product-card">
-          \${p.imageUrl ? \`<img src="\${p.imageUrl}" style="width:100%; height:160px; object-fit:cover; border-radius:12px; margin-bottom:12px;">\` : ''}
-          <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
-            <strong style="font-size:15px;">\${p.titleEn}</strong>
-            <span style="color:#10B981; font-weight:700;">৳\${p.discountPriceBdt || p.priceBdt}</span>
-          </div>
-          <div style="font-size:12px; color:var(--text-slate);">SKU: \${p.sku} • Stock: \${p.stockQuantity} pcs</div>
-          <div style="margin-top:8px;">
-            \${(p.voiceTags || []).map(t => \`<span class="tag-pill" style="font-size:10px; padding:2px 8px; margin-right:4px;">\${t}</span>\`).join('')}
-          </div>
-        </div>
-      \`).join('');
-    }
-
     function formatAiReplyHtml(text) {
       if (!text) return '';
-      // Convert markdown image tags ![alt](url) to responsive img elements
-      let html = text.replace(/!\[(.*?)\]\((.*?)\)/g, '<br><img src="$2" alt="$1" style="max-width:100%; max-height:220px; border-radius:12px; margin-top:8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display:block;"><br>');
+      let html = text.replace(/!\\[(.*?)\\]\\((.*?)\\)/g, '<br><img src="$2" alt="$1" style="max-width:100%; max-height:220px; border-radius:12px; margin-top:8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display:block;"><br>');
       return html;
     }
 
@@ -735,7 +1322,7 @@ app.get('/admin', (req: Request, res: Response) => {
       if (!text) return;
 
       const stream = document.getElementById('chatStream');
-      stream.innerHTML += \`<div class="msg-bubble user">\${text}</div>\`;
+      stream.innerHTML += \`<div class="msg-card user">\${text}</div>\`;
       input.value = '';
 
       const res = await fetch('/api/admin/test-chat', {
@@ -746,8 +1333,33 @@ app.get('/admin', (req: Request, res: Response) => {
       const data = await res.json();
 
       const replyHtml = formatAiReplyHtml(data.replyText);
-      stream.innerHTML += \`<div class="msg-bubble ai">\${replyHtml}</div>\`;
+      stream.innerHTML += \`<div class="msg-card ai">\${replyHtml}</div>\`;
       stream.scrollTop = stream.scrollHeight;
+
+      if (data.telemetry) {
+        document.getElementById('latencyVal').innerText = \`\${data.telemetry.latencyMs} ms\`;
+        document.getElementById('telemetryProof').innerText = JSON.stringify(data.telemetry.groundingProof || {}, null, 2);
+      }
+    }
+
+    async function loadProducts() {
+      const res = await fetch('/api/admin/products');
+      const data = await res.json();
+      const grid = document.getElementById('productGrid');
+
+      grid.innerHTML = data.products.map(p => \`
+        <div class="atelier-card catalog-item-card">
+          \${p.imageUrl ? \`<img src="\${p.imageUrl}" style="width:100%; height:160px; object-fit:cover; border-radius:12px; margin-bottom:12px;">\` : ''}
+          <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+            <strong style="font-size:15px; font-family:var(--_font-display);">\${p.titleEn}</strong>
+            <span style="color:var(--color-emerald); font-weight:700; font-family:var(--_font-mono);">৳\${p.discountPriceBdt || p.priceBdt}</span>
+          </div>
+          <div style="font-size:12px; color:var(--t-muted); font-family:var(--_font-mono);">SKU: \${p.sku} • Stock: \${p.stockQuantity} pcs</div>
+          <div style="margin-top:10px;">
+            \${(p.voiceTags || []).map(t => \`<span class="tag-pill-item" style="font-size:10px; padding:2px 8px; margin-right:4px;">\${t}</span>\`).join('')}
+          </div>
+        </div>
+      \`).join('');
     }
 
     async function submitOnboardingForm() {
@@ -779,6 +1391,7 @@ app.get('/admin', (req: Request, res: Response) => {
 
     applyTheme(currentTheme);
     renderTags();
+    setTimeout(initMatterPhysics, 200);
   </script>
 </body>
 </html>
@@ -786,5 +1399,5 @@ app.get('/admin', (req: Request, res: Response) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`[Mattic Server] Server & Admin Dashboard running on http://localhost:${PORT}/admin`);
+  console.log(`[ChatNab Server] ChatNab Kinetic Server running on http://localhost:${PORT}/admin`);
 });
