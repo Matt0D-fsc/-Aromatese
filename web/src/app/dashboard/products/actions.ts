@@ -105,7 +105,6 @@ export async function autofillProduct(titleEn: string): Promise<{ error: string 
   await requireMerchant();
   const title = String(titleEn ?? '').trim().slice(0, 200);
   if (!title) return { error: 'Type the English title first.' };
-  if (!process.env.GEMINI_API_KEY && !process.env.GEMINI_API_KEYS) return { error: 'AI auto-fill is not set up yet (GEMINI_API_KEY missing).' };
 
   try {
     const res = await generateContent({
@@ -113,7 +112,9 @@ export async function autofillProduct(titleEn: string): Promise<{ error: string 
       contents: `Product title: ${JSON.stringify(title)}`,
       config: { systemInstruction: AUTOFILL_PROMPT, responseMimeType: 'application/json', temperature: 0.2 },
     });
-    const d = JSON.parse(res.text ?? '{}');
+    // Some models (especially in-house ones) wrap the JSON in prose, code fences or <think> blocks: keep only the object.
+    const raw = (res.text ?? '').replace(/<think>[\s\S]*?<\/think>/g, '');
+    const d = JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1));
     const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
     return {
       data: {
@@ -125,8 +126,11 @@ export async function autofillProduct(titleEn: string): Promise<{ error: string 
         customNotes: str(d.customNotes),
       },
     };
-  } catch {
+  } catch (err) {
+    console.error('[autofill] failed', err);
     // No made-up fallback data: a failed AI call should leave the form for the merchant to fill.
+    const status = (err as { status?: number })?.status;
+    if (status === 429 || status === 503) return { error: 'The AI is busy right now (usage limit or high demand). Wait a minute and try again.' };
     return { error: 'AI auto-fill failed. Fill the fields yourself or try again.' };
   }
 }

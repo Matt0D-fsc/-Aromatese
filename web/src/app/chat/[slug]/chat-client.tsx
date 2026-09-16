@@ -6,6 +6,8 @@ import { mediaLabel, taka, type ChatLine, type ChatProduct } from '@/lib/chat';
 const MAX_RECORD_MS = 60_000;
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const POLL_MS = 4000;
+// crypto.randomUUID only exists on https/localhost; phones testing over the LAN use plain http.
+const tempId = () => `local-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const AUDIO_TYPES = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg;codecs=opus'];
 
 export function ChatClient({ slug, shopName, initial, since }: { slug: string; shopName: string; initial: ChatLine[]; since: string | null }) {
@@ -52,7 +54,7 @@ export function ChatClient({ slug, shopName, initial, since }: { slug: string; s
 
     const kind = file ? (file.type.startsWith('audio/') ? 'audio' : 'image') : 'text';
     const localUrl = file ? URL.createObjectURL(file) : undefined;
-    setLines((l) => [...l, { id: crypto.randomUUID(), from: 'customer', kind, text: clean, products: [], orderNumber: null, localUrl }]);
+    setLines((l) => [...l, { id: tempId(), from: 'customer', kind, text: clean, products: [], orderNumber: null, localUrl }]);
     setDraft('');
     setError('');
     setBusy(true);
@@ -68,7 +70,7 @@ export function ChatClient({ slug, shopName, initial, since }: { slug: string; s
       else if (!data.staff)
         setLines((l) => [
           ...l,
-          { id: crypto.randomUUID(), from: 'bot', kind: 'text', text: 'Dhonnobad! Amader shop team ekhane ektu porei reply debe.', products: [], orderNumber: null },
+          { id: tempId(), from: 'bot', kind: 'text', text: 'Dhonnobad! Amader shop team ekhane ektu porei reply debe.', products: [], orderNumber: null },
         ]);
     } catch {
       setError('No connection. Try again.');

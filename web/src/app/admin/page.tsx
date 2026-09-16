@@ -4,6 +4,9 @@ import { signOut } from '@/app/login/actions';
 import { taka } from '@/lib/chat';
 import { btnDanger, btnGhost, card, input, statusBadge } from '@/components/ui';
 import { LiveRefresh } from '@/components/live-refresh';
+import { getAiSettings } from '@/lib/ai-settings';
+import { GEMINI_MODEL } from '@/lib/gemini';
+import { AiEngineForm } from './ai-engine-form';
 import { InviteForm } from './invite-form';
 import { setTenantStatus, updateMessageLimit } from './actions';
 
@@ -33,6 +36,8 @@ export default async function AdminPage() {
     supabase.from('tenant_usage_month').select('*'),
   ]);
   const tenants = (data ?? []) as TenantRow[];
+  // Server-only read (requireAdmin above). Only whether a key exists is passed to the browser, never the key.
+  const ai = await getAiSettings();
   const usage = new Map(((usageData ?? []) as UsageRow[]).map((u) => [u.tenant_id, u]));
 
   const totals = [...usage.values()].reduce(
@@ -69,6 +74,17 @@ export default async function AdminPage() {
               <p className="mt-1 text-xl font-semibold tabular-nums">{value}</p>
             </div>
           ))}
+        </section>
+
+        <section className={card}>
+          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-base font-semibold">AI engine</h2>
+            <p className="text-sm text-zinc-500">
+              Powers every shop&apos;s chat agent and AI fill. Now using:{' '}
+              <span className="font-medium text-zinc-900">{ai.provider === 'custom' ? `In-house · ${ai.model}` : `Gemini · ${GEMINI_MODEL}`}</span>
+            </p>
+          </div>
+          <AiEngineForm provider={ai.provider} apiFormat={ai.apiFormat} baseUrl={ai.baseUrl ?? ''} model={ai.model ?? ''} hasKey={!!ai.apiKey} geminiModel={GEMINI_MODEL} />
         </section>
 
         <section className={card}>

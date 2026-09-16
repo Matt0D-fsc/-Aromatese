@@ -77,8 +77,9 @@ async function aiReply(db: Db, input: AgentInput): Promise<ChatLine | null> {
 
 function agentFailed(err: unknown) {
   console.error('[chat] agent failed', err);
-  // 429 = the AI quota is spent for now; say so instead of looking broken.
-  return (err as { status?: number })?.status === 429
+  // 429/503 = every model is out of quota or overloaded right now; say so instead of looking broken.
+  const status = (err as { status?: number })?.status;
+  return status === 429 || status === 503
     ? fail(429, 'AI ekhon onek bochchi busy. Ektu pore abar try korun, ba shop team ke wait korun.')
     : fail(502, 'Dukkhito, reply dite parlam na. Abar try korun.');
 }
