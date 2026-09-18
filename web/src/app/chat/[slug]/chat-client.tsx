@@ -200,7 +200,7 @@ export function ChatClient({ slug, shopName, logoUrl, initial, since }: { slug: 
           maxLength={2000}
           aria-label="Message"
         />
-        <button className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50" disabled={busy || !draft.trim()}>
+        <button className="min-h-11 rounded-control bg-accent px-4 text-sm font-semibold text-accent-foreground transition-colors duration-150 hover:bg-accent-strong disabled:opacity-50" disabled={busy || !draft.trim()}>
           Send
         </button>
       </form>
@@ -213,7 +213,7 @@ function Bubble({ mine, children }: { mine: boolean; children: React.ReactNode }
     <div className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
       <div
         className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-[15px] leading-relaxed ${
-          mine ? 'rounded-br-sm bg-zinc-900 text-white' : 'rounded-bl-sm border border-zinc-200 bg-white text-zinc-900'
+          mine ? 'rounded-br-sm bg-accent text-accent-foreground' : 'rounded-bl-sm border border-line bg-surface text-foreground'
         }`}
       >
         {children}
@@ -243,7 +243,7 @@ function ProductCard({ product: p, onOrder, disabled }: { product: ChatProduct; 
           {p.stock <= 0 ? 'Out of stock' : p.stock <= 3 ? `Only ${p.stock} left` : 'In stock'}
         </p>
         {p.stock > 0 && (
-          <button type="button" onClick={onOrder} disabled={disabled} className="mt-1 w-full rounded-lg bg-zinc-900 py-1.5 text-xs font-medium text-white disabled:opacity-50">
+          <button type="button" onClick={onOrder} disabled={disabled} className="mt-1 min-h-9 w-full rounded-chip bg-accent text-xs font-semibold text-accent-foreground transition-colors duration-150 hover:bg-accent-strong disabled:opacity-50">
             Order this
           </button>
         )}
