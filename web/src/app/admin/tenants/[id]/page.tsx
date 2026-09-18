@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireAdmin } from '@/lib/auth';
+import { MicIcon, PhotoIcon } from '@/components/icons';
 import { btnGhost, card, input, statusBadge } from '@/components/ui';
 import { dhakaTime, mediaLabel, taka, toChatLine, MESSAGE_COLUMNS, type MessageRow } from '@/lib/chat';
 import { POLICY_FIELDS, readPolicies } from '@/lib/policies';
@@ -205,7 +206,12 @@ export default async function AdminTenantPage({ params, searchParams }: { params
                       }`}
                     >
                       {!fromCustomer && <p className="text-[10px] font-semibold uppercase opacity-70">{line.from === 'agent' ? 'Team' : 'AI'}</p>}
-                      {line.kind !== 'text' && <p className="opacity-70">{mediaLabel(line.kind)}</p>}
+                      {line.kind !== 'text' && (
+                        <p className="flex items-center gap-1.5 opacity-70">
+                          {line.kind === 'audio' ? <MicIcon size={14} /> : <PhotoIcon size={14} />}
+                          {mediaLabel(line.kind)}
+                        </p>
+                      )}
                       {line.mediaNote && <p className="text-xs italic opacity-70">{line.mediaNote}</p>}
                       {line.text && <p className="whitespace-pre-wrap">{line.text}</p>}
                       <p className="mt-1 text-[10px] opacity-60">{dhakaTime(m.created_at)}</p>

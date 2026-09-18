@@ -61,7 +61,8 @@ export const toChatLine = (m: MessageRow): ChatLine => ({
   createdAt: m.created_at,
 });
 
-export const mediaLabel = (kind: ChatLine['kind']) => (kind === 'audio' ? '🎤 Voice note' : kind === 'image' ? '📷 Photo' : '');
+// Text only: the icon beside it is drawn by whoever renders this, so it can take a colour and a size.
+export const mediaLabel = (kind: ChatLine['kind']) => (kind === 'audio' ? 'Voice note' : kind === 'image' ? 'Photo' : '');
 
 // PostgREST's or() filter uses commas and parentheses as separators and * and % as wildcards: a search box
 // must never be able to smuggle one into the query it builds.

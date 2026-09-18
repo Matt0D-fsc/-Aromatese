@@ -2,13 +2,18 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { mediaLabel, taka, type ChatLine, type ChatProduct } from '@/lib/chat';
+import { CheckIcon, CloseIcon, MicIcon, PhotoIcon, SendIcon } from '@/components/icons';
 
 const MAX_RECORD_MS = 60_000;
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const POLL_MS = 4000;
+const METER_MS = 100;
+const LEVEL_BARS = 16;
 // crypto.randomUUID only exists on https/localhost; phones testing over the LAN use plain http.
 const tempId = () => `local-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const AUDIO_TYPES = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg;codecs=opus'];
+
+const clock = (ms: number) => `${Math.floor(ms / 60_000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
 
 export function ChatClient({ slug, shopName, logoUrl, initial, since }: { slug: string; shopName: string; logoUrl?: string | null; initial: ChatLine[]; since: string | null }) {
   const [lines, setLines] = useState(initial);
@@ -16,7 +21,13 @@ export function ChatClient({ slug, shopName, logoUrl, initial, since }: { slug: 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [recording, setRecording] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const [levels, setLevels] = useState<number[]>(() => Array(LEVEL_BARS).fill(0));
   const recorder = useRef<MediaRecorder | null>(null);
+  // Set before stop() so the recorder's own onstop knows whether this was a send or a cancel.
+  const discard = useRef(false);
+  const meter = useRef<{ ctx: AudioContext; analyser: AnalyserNode; data: Uint8Array<ArrayBuffer> } | null>(null);
+  const ticker = useRef<ReturnType<typeof setInterval> | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const cursor = useRef(since);
 
@@ -46,6 +57,16 @@ export function ChatClient({ slug, shopName, logoUrl, initial, since }: { slug: 
   useEffect(() => {
     bottom.current?.scrollIntoView({ behavior: 'smooth' });
   }, [lines, busy]);
+
+  // Leaving the page mid-recording must not leave the microphone open.
+  useEffect(() => {
+    return () => {
+      if (ticker.current) clearInterval(ticker.current);
+      void meter.current?.ctx.close();
+      discard.current = true;
+      recorder.current?.stop();
+    };
+  }, []);
 
   async function send(text: string, file?: File) {
     const clean = text.trim();
@@ -79,8 +100,13 @@ export function ChatClient({ slug, shopName, logoUrl, initial, since }: { slug: 
     }
   }
 
-  async function toggleRecording() {
-    if (recorder.current) return recorder.current.stop();
+  function endRecording(keep: boolean) {
+    discard.current = !keep;
+    recorder.current?.stop();
+  }
+
+  async function startRecording() {
+    if (recorder.current) return;
 
     let stream: MediaStream;
     try {
@@ -88,30 +114,83 @@ export function ChatClient({ slug, shopName, logoUrl, initial, since }: { slug: 
     } catch {
       return setError('Allow microphone access to send a voice note.');
     }
+
     const type = AUDIO_TYPES.find((t) => MediaRecorder.isTypeSupported(t));
-    const rec = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
     const chunks: Blob[] = [];
+    let rec: MediaRecorder;
+
+    try {
+      rec = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
+    } catch {
+      stream.getTracks().forEach((t) => t.stop());
+      return setError('Voice notes do not work in this browser. Please type your message.');
+    }
+
     rec.ondataavailable = (e) => chunks.push(e.data);
     rec.onstop = () => {
       stream.getTracks().forEach((t) => t.stop());
+      if (ticker.current) clearInterval(ticker.current);
+      ticker.current = null;
+      void meter.current?.ctx.close();
+      meter.current = null;
       recorder.current = null;
       setRecording(false);
+      setElapsed(0);
+      setLevels(Array(LEVEL_BARS).fill(0));
+
       const blob = new Blob(chunks, { type: rec.mimeType });
-      if (blob.size > 0) send('', new File([blob], 'voice-note', { type: rec.mimeType }));
+      if (!discard.current && blob.size > 0) send('', new File([blob], 'voice-note', { type: rec.mimeType }));
     };
-    rec.start();
+
+    discard.current = false;
+    // A browser can accept the mime type and still refuse to start. Unhandled, that leaves the customer
+    // tapping a microphone button that does nothing.
+    try {
+      rec.start();
+    } catch {
+      stream.getTracks().forEach((t) => t.stop());
+      return setError('Could not start recording. Please type your message.');
+    }
+
     recorder.current = rec;
     setRecording(true);
     setError('');
-    setTimeout(() => rec.state === 'recording' && rec.stop(), MAX_RECORD_MS);
+
+    // The bars are the real microphone level, not an animation: a muted or dead mic looks flat, which is
+    // the one thing a customer needs to know before they send.
+    try {
+      const ctx = new AudioContext();
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      ctx.createMediaStreamSource(stream).connect(analyser);
+      meter.current = { ctx, analyser, data: new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount)) };
+    } catch {
+      meter.current = null; // No Web Audio: the timer and the cancel still work.
+    }
+
+    const startedAt = Date.now();
+    ticker.current = setInterval(() => {
+      const ms = Date.now() - startedAt;
+      setElapsed(ms);
+
+      const m = meter.current;
+      if (m) {
+        m.analyser.getByteTimeDomainData(m.data);
+        let peak = 0;
+        for (const sample of m.data) peak = Math.max(peak, Math.abs(sample - 128));
+        setLevels((l) => [...l.slice(1), Math.min(1, peak / 70)]);
+      }
+
+      if (ms >= MAX_RECORD_MS) endRecording(true);
+    }, METER_MS);
   }
 
   return (
-    <div className="mx-auto flex h-dvh max-w-2xl flex-col bg-zinc-50">
-      <header className="flex items-center gap-3 border-b border-zinc-200 bg-white px-4 py-3">
+    <div className="mx-auto flex h-dvh max-w-2xl flex-col bg-background">
+      <header className="flex items-center gap-3 border-b border-line bg-surface px-4 py-3">
         {logoUrl && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={logoUrl} alt="" className="h-10 w-10 shrink-0 rounded-full border border-zinc-200 object-cover" />
+          <img src={logoUrl} alt="" className="h-10 w-10 shrink-0 rounded-full border border-line object-cover" />
         )}
         <div className="min-w-0">
           <p className="truncate font-semibold">{shopName}</p>
@@ -122,21 +201,35 @@ export function ChatClient({ slug, shopName, logoUrl, initial, since }: { slug: 
       <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
         {lines.length === 0 && (
           <Bubble mine={false}>
-            Assalamu alaikum! 👋 Ki khujchen? Type a message, send a voice note 🎤 or a photo 📷 of what you want.
+            <p>Assalamu alaikum! Ki khujchen?</p>
+            <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-zinc-500">
+              Likhun, <MicIcon size={15} className="inline-block" /> voice note pathan, ba
+              <PhotoIcon size={15} className="inline-block" /> chobi din.
+            </p>
           </Bubble>
         )}
         {lines.map((line) => (
           <div key={line.id} className="space-y-2">
             <Bubble mine={line.from === 'customer'}>
-              {line.from === 'agent' && <p className="mb-0.5 text-xs font-semibold text-emerald-700">Team member</p>}
+              {line.from === 'agent' && <p className="mb-0.5 text-xs font-semibold text-accent-strong">Team member</p>}
               {line.localUrl && line.kind === 'image' && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={line.localUrl} alt="Your photo" className="mb-1 max-h-48 rounded-lg" />
               )}
               {line.localUrl && line.kind === 'audio' && <audio controls src={line.localUrl} className="max-w-full" />}
-              {!line.localUrl && line.kind !== 'text' && <p className="opacity-70">{mediaLabel(line.kind)}</p>}
+              {!line.localUrl && line.kind !== 'text' && (
+                <p className="flex items-center gap-1.5 opacity-70">
+                  {line.kind === 'audio' ? <MicIcon size={15} /> : <PhotoIcon size={15} />}
+                  {mediaLabel(line.kind)}
+                </p>
+              )}
               {line.text && <p className="whitespace-pre-wrap">{line.text}</p>}
-              {line.orderNumber && <p className="mt-1 text-xs font-semibold text-emerald-700">Order {line.orderNumber} placed ✓</p>}
+              {line.orderNumber && (
+                <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold">
+                  <CheckIcon size={14} />
+                  Order {line.orderNumber} placed
+                </p>
+              )}
             </Bubble>
             {line.products.length > 0 && (
               <div className="flex gap-3 overflow-x-auto pb-1">
@@ -156,54 +249,96 @@ export function ChatClient({ slug, shopName, logoUrl, initial, since }: { slug: 
       </div>
 
       {error && (
-        <p className="px-4 pb-2 text-sm text-red-600" role="alert">
+        <p className="px-4 pb-2 text-sm text-danger" role="alert">
           {error}
         </p>
       )}
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          send(draft);
-        }}
-        className="flex items-center gap-2 border-t border-zinc-200 bg-white p-3"
-      >
-        <label className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full text-xl hover:bg-zinc-100" aria-label="Send a photo">
-          📷
-          <input
-            type="file"
-            accept="image/*"
-            className="sr-only"
-            disabled={busy || recording}
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) send(draft, f);
-              e.target.value = '';
+      <div className="border-t border-line bg-surface p-3">
+        {recording ? (
+          <div className="flex items-center gap-2 rounded-control bg-danger-soft py-1.5 pl-3.5 pr-1.5">
+            <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-danger" />
+            <span className="shrink-0 text-sm font-semibold tabular-nums text-danger-strong">{clock(elapsed)}</span>
+            <div className="flex h-6 min-w-0 flex-1 items-center gap-[3px] overflow-hidden" aria-hidden="true">
+              {levels.map((level, i) => (
+                <span
+                  key={i}
+                  className="w-[3px] shrink-0 rounded-full bg-danger transition-[height] duration-100 ease-out"
+                  style={{ height: `${Math.round(Math.max(0.14, level) * 100)}%` }}
+                />
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => endRecording(false)}
+              aria-label="Cancel recording"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control text-danger-strong hover:bg-danger/10"
+            >
+              <CloseIcon size={19} />
+            </button>
+            <button
+              type="button"
+              onClick={() => endRecording(true)}
+              aria-label="Send voice note"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control bg-accent text-accent-foreground transition-colors duration-150 hover:bg-accent-strong"
+            >
+              <SendIcon size={19} />
+            </button>
+          </div>
+        ) : (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              send(draft);
             }}
-          />
-        </label>
-        <button
-          type="button"
-          onClick={toggleRecording}
-          disabled={busy && !recording}
-          aria-label={recording ? 'Stop and send voice note' : 'Record a voice note'}
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl disabled:opacity-50 ${recording ? 'animate-pulse bg-red-600 text-white' : 'hover:bg-zinc-100'}`}
-        >
-          {recording ? '■' : '🎤'}
-        </button>
-        <input
-          className="min-w-0 flex-1 rounded-full border border-zinc-300 px-4 py-2 text-[15px] focus:border-zinc-900 focus:outline-none"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder={recording ? 'Recording… tap ■ to send' : 'Message'}
-          disabled={recording}
-          maxLength={2000}
-          aria-label="Message"
-        />
-        <button className="min-h-11 rounded-control bg-accent px-4 text-sm font-semibold text-accent-foreground transition-colors duration-150 hover:bg-accent-strong disabled:opacity-50" disabled={busy || !draft.trim()}>
-          Send
-        </button>
-      </form>
+            className="flex items-center gap-2"
+          >
+            <label className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-control border border-line text-zinc-600 hover:bg-content2" aria-label="Send a photo">
+              <PhotoIcon />
+              <input
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                disabled={busy}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) send(draft, f);
+                  e.target.value = '';
+                }}
+              />
+            </label>
+            <input
+              className="min-h-11 min-w-0 flex-1 rounded-control border border-line px-4 text-[15px] transition-colors duration-150 focus:border-accent focus:outline-none focus:ring-[3px] focus:ring-accent/15"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder="Likhun…"
+              maxLength={2000}
+              aria-label="Message"
+            />
+            {/* One button, two jobs: it sends what is typed, and records when nothing is. */}
+            {draft.trim() ? (
+              <button
+                type="submit"
+                aria-label="Send message"
+                disabled={busy}
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-control bg-accent text-accent-foreground transition-colors duration-150 hover:bg-accent-strong disabled:opacity-50"
+              >
+                <SendIcon size={21} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={startRecording}
+                aria-label="Record a voice note"
+                disabled={busy}
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-control bg-accent text-accent-foreground transition-colors duration-150 hover:bg-accent-strong disabled:opacity-50"
+              >
+                <MicIcon size={21} />
+              </button>
+            )}
+          </form>
+        )}
+      </div>
     </div>
   );
 }
@@ -224,8 +359,8 @@ function Bubble({ mine, children }: { mine: boolean; children: React.ReactNode }
 
 function ProductCard({ product: p, onOrder, disabled }: { product: ChatProduct; onOrder: () => void; disabled: boolean }) {
   return (
-    <div className="w-44 shrink-0 overflow-hidden rounded-xl border border-zinc-200 bg-white">
-      <div className="aspect-square bg-zinc-100">
+    <div className="w-44 shrink-0 overflow-hidden rounded-card border border-line bg-surface">
+      <div className="aspect-square bg-content2">
         {p.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={p.imageUrl} alt={p.title} className="h-full w-full object-cover" />
@@ -235,11 +370,11 @@ function ProductCard({ product: p, onOrder, disabled }: { product: ChatProduct; 
       </div>
       <div className="space-y-1 p-2.5 text-sm">
         <p className="line-clamp-2 font-medium leading-snug">{p.title}</p>
-        <p className="font-semibold">
+        <p className="font-semibold tabular-nums">
           {taka(p.price)}
           {p.regularPrice != null && <span className="ml-1 text-xs font-normal text-zinc-400 line-through">{taka(p.regularPrice)}</span>}
         </p>
-        <p className={`text-xs ${p.stock > 0 ? 'text-zinc-500' : 'text-red-600'}`}>
+        <p className={`text-xs ${p.stock > 0 ? 'text-zinc-500' : 'text-danger'}`}>
           {p.stock <= 0 ? 'Out of stock' : p.stock <= 3 ? `Only ${p.stock} left` : 'In stock'}
         </p>
         {p.stock > 0 && (

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { requireMerchant } from '@/lib/auth';
+import { MicIcon, PhotoIcon } from '@/components/icons';
 import { getLang, t } from '@/lib/i18n';
 import { btn, btnDanger, btnGhost, card, input } from '@/components/ui';
 import { CHAT_MEDIA_BUCKET, MESSAGE_COLUMNS, dhakaTime, mediaLabel, taka, toChatLine, type MessageRow } from '@/lib/chat';
@@ -169,7 +170,12 @@ export default async function ChatsPage({ searchParams }: { searchParams: Promis
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={mediaUrl} alt={line.mediaNote || 'Photo the customer sent'} className="mb-1 max-h-48 rounded-lg" />
                       )}
-                      {line.kind !== 'text' && !mediaUrl && <p className="opacity-70">{mediaLabel(line.kind)}</p>}
+                      {line.kind !== 'text' && !mediaUrl && (
+                        <p className="flex items-center gap-1.5 opacity-70">
+                          {line.kind === 'audio' ? <MicIcon size={14} /> : <PhotoIcon size={14} />}
+                          {mediaLabel(line.kind)}
+                        </p>
+                      )}
                       {line.mediaNote && <p className="text-xs italic opacity-70">{line.mediaNote}</p>}
                       {line.text && <p className="whitespace-pre-wrap">{line.text}</p>}
                       {line.products.length > 0 && (
