@@ -54,6 +54,9 @@ export function ProductForm({ tenantId, product, isNew }: { tenantId: string; pr
     setUploading(false);
   }
 
+  const setVariant = (index: number, patch: Partial<ProductInput['variants'][number]>) =>
+    setForm((f) => ({ ...f, variants: f.variants.map((v, i) => (i === index ? { ...v, ...patch } : v)) }));
+
   // ponytail: removing a photo only unlinks it; the file is cleaned up when the product is deleted.
   const removePhoto = (url: string) => setForm((f) => ({ ...f, imageUrls: f.imageUrls.filter((u) => u !== url) }));
   const makeCover = (url: string) => setForm((f) => ({ ...f, imageUrls: [url, ...f.imageUrls.filter((u) => u !== url)] }));
@@ -195,6 +198,65 @@ export function ProductForm({ tenantId, product, isNew }: { tenantId: string; pr
               <label className={label} htmlFor="description">Description</label>
               <textarea className={input} id="description" rows={3} {...bind('description')} placeholder="Size, fabric, fit, what's included…" />
             </div>
+          </section>
+
+          <section className={`${card} space-y-4`}>
+            <div>
+              <h2 className="font-semibold">Sizes and colours</h2>
+              <p className={hint}>
+                Optional. Add one row per size or colour and the AI can answer &ldquo;ei size ta ache?&rdquo; itself. Leave the price blank to use the
+                product price.
+              </p>
+            </div>
+            {form.variants.length > 0 && (
+              <ul className="space-y-2">
+                {form.variants.map((v, i) => (
+                  <li key={i} className="grid grid-cols-[1fr_6rem_5rem_2rem] gap-2">
+                    <input
+                      className={input}
+                      value={v.name}
+                      onChange={(e) => setVariant(i, { name: e.target.value })}
+                      placeholder="M / Red"
+                      aria-label={`Size or colour ${i + 1}`}
+                      maxLength={100}
+                    />
+                    <input
+                      className={input}
+                      value={v.priceBdt}
+                      onChange={(e) => setVariant(i, { priceBdt: e.target.value })}
+                      type="number"
+                      min={0}
+                      placeholder="Price"
+                      aria-label={`Price for ${v.name || `size ${i + 1}`}`}
+                    />
+                    <input
+                      className={input}
+                      value={v.stockQuantity}
+                      onChange={(e) => setVariant(i, { stockQuantity: e.target.value })}
+                      type="number"
+                      min={0}
+                      placeholder="Stock"
+                      aria-label={`Stock for ${v.name || `size ${i + 1}`}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, variants: f.variants.filter((_, x) => x !== i) }))}
+                      className="rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-red-600"
+                      aria-label={`Remove ${v.name || `size ${i + 1}`}`}
+                    >
+                      ✕
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <button
+              type="button"
+              className={btnGhost}
+              onClick={() => setForm((f) => ({ ...f, variants: [...f.variants, { name: '', priceBdt: '', stockQuantity: '0' }] }))}
+            >
+              + Add a size or colour
+            </button>
           </section>
         </div>
 

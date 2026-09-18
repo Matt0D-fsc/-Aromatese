@@ -8,6 +8,9 @@ export type AiSettings = {
   baseUrl: string | null;
   model: string | null;
   apiKey: string | null;
+  // What a million AI tokens costs the platform, in taka. 0 means "not set": the admin panel shows no cost
+  // rather than a number nobody chose.
+  takaPerMillionTokens: number;
 };
 
 // Read before every AI call; cached briefly so one chat reply (several model calls) costs one query.
@@ -20,7 +23,7 @@ export async function getAiSettings(): Promise<AiSettings> {
   if (cached && Date.now() - cached.at < TTL_MS) return cached.value;
   const { data, error } = await createAdminClient()
     .from('platform_settings')
-    .select('ai_provider, custom_api_format, custom_base_url, custom_model, custom_api_key')
+    .select('ai_provider, custom_api_format, custom_base_url, custom_model, custom_api_key, taka_per_million_tokens')
     .eq('id', true)
     .maybeSingle();
   if (error) throw error;
@@ -30,6 +33,7 @@ export async function getAiSettings(): Promise<AiSettings> {
     baseUrl: data?.custom_base_url ?? null,
     model: data?.custom_model ?? null,
     apiKey: data?.custom_api_key ?? null,
+    takaPerMillionTokens: Number(data?.taka_per_million_tokens ?? 0),
   };
   cached = { at: Date.now(), value };
   return value;

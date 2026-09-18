@@ -55,7 +55,8 @@ async function withAnyKey(params: Params): Promise<Result> {
   throw lastError;
 }
 
-async function geminiGenerateContent(params: Params): Promise<Result> {
+// Exported so voice-note transcription can stay on Gemini whatever engine the admin picked (see lib/media.ts).
+export async function geminiGenerateContent(params: Params): Promise<Result> {
   const all = [params.model, ...FALLBACK_MODELS.filter((m) => m !== params.model)];
   const ready = all.filter((m) => (coolingUntil.get(m) ?? 0) < Date.now());
   const models = ready.length ? ready : all;
@@ -71,6 +72,23 @@ async function geminiGenerateContent(params: Params): Promise<Result> {
     }
   }
   throw lastError;
+}
+
+// Voice notes. The in-house engine hosts Gemini too, so it gets the audio when its API format can carry it:
+// OpenAI's format has an input_audio part, the Anthropic Messages format has no audio block at all, so a voice
+// note cannot be expressed in it whatever model the gateway runs behind it.
+// Unlike a chat reply, a transcript falls back to Gemini rather than failing: the merchant's inbox depends on it.
+export async function generateAudioContent(params: Params): Promise<Result> {
+  const settings = await getAiSettings();
+  if (settings.provider === 'gemini') return geminiGenerateContent(params);
+  if (settings.apiFormat === 'openai') {
+    try {
+      return await generateContent(params);
+    } catch (err) {
+      console.warn('[ai] the in-house engine could not transcribe the audio, using Gemini instead', err);
+    }
+  }
+  return geminiGenerateContent(params);
 }
 
 export async function generateContent(params: Params): Promise<Result> {

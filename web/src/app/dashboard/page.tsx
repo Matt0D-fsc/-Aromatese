@@ -1,11 +1,12 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { requireMerchant } from '@/lib/auth';
+import { getLang, t } from '@/lib/i18n';
 import { btn, card } from '@/components/ui';
 import type { ProductRow } from './products/product-input';
 
 export default async function ProductsPage() {
-  const { supabase, tenant } = await requireMerchant();
+  const [{ supabase, tenant }, lang] = await Promise.all([requireMerchant(), getLang()]);
   if (!tenant.onboarding_completed_at) redirect('/dashboard/onboarding');
 
   const { data } = await supabase
@@ -19,19 +20,19 @@ export default async function ProductsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Products</h1>
-          <p className="mt-1 text-sm text-zinc-500">Your AI sales agent can only sell, suggest and show what&apos;s listed here.</p>
+          <h1 className="text-2xl font-semibold">{t(lang, 'products.title')}</h1>
+          <p className="mt-1 text-sm text-zinc-500">{t(lang, 'products.subtitle')}</p>
         </div>
-        <Link href="/dashboard/products/new" className={btn}>+ Add product</Link>
+        <Link href="/dashboard/products/new" className={btn}>{t(lang, 'products.add')}</Link>
       </div>
 
       {products.length === 0 ? (
         <div className={`${card} py-16 text-center`}>
-          <p className="text-lg font-medium">Add your first product</p>
+          <p className="text-lg font-medium">{t(lang, 'products.emptyTitle')}</p>
           <p className="mx-auto mt-1 max-w-md text-sm text-zinc-500">
-            Upload photos, set the price and stock, and let AI write the Bangla and Banglish titles. Once you have products, the AI can start selling.
+            {t(lang, 'products.emptyBody')}
           </p>
-          <Link href="/dashboard/products/new" className={`${btn} mt-6`}>+ Add product</Link>
+          <Link href="/dashboard/products/new" className={`${btn} mt-6`}>{t(lang, 'products.add')}</Link>
         </div>
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -51,7 +52,7 @@ export default async function ProductsPage() {
                   <div className="space-y-1 p-4">
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-medium leading-snug">{p.title_en}</p>
-                      {!p.is_active && <span className="shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-500">Hidden</span>}
+                      {!p.is_active && <span className="shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-500">{t(lang, 'products.hidden')}</span>}
                     </div>
                     {p.title_bn && <p className="text-sm text-zinc-500">{p.title_bn}</p>}
                     <div className="flex items-center justify-between pt-1 text-sm">
@@ -62,7 +63,7 @@ export default async function ProductsPage() {
                         )}
                       </span>
                       <span className={p.stock_quantity > 0 ? 'text-zinc-500' : 'font-medium text-red-600'}>
-                        {p.stock_quantity > 0 ? `${p.stock_quantity} in stock` : 'Out of stock'}
+                        {p.stock_quantity > 0 ? `${p.stock_quantity} ${t(lang, 'products.inStock')}` : t(lang, 'products.outOfStock')}
                       </span>
                     </div>
                   </div>

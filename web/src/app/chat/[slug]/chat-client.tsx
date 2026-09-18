@@ -10,7 +10,7 @@ const POLL_MS = 4000;
 const tempId = () => `local-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const AUDIO_TYPES = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg;codecs=opus'];
 
-export function ChatClient({ slug, shopName, initial, since }: { slug: string; shopName: string; initial: ChatLine[]; since: string | null }) {
+export function ChatClient({ slug, shopName, logoUrl, initial, since }: { slug: string; shopName: string; logoUrl?: string | null; initial: ChatLine[]; since: string | null }) {
   const [lines, setLines] = useState(initial);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -54,7 +54,7 @@ export function ChatClient({ slug, shopName, initial, since }: { slug: string; s
 
     const kind = file ? (file.type.startsWith('audio/') ? 'audio' : 'image') : 'text';
     const localUrl = file ? URL.createObjectURL(file) : undefined;
-    setLines((l) => [...l, { id: tempId(), from: 'customer', kind, text: clean, products: [], orderNumber: null, localUrl }]);
+    setLines((l) => [...l, { id: tempId(), from: 'customer', kind, text: clean, products: [], orderNumber: null, mediaPath: null, mediaNote: '', localUrl }]);
     setDraft('');
     setError('');
     setBusy(true);
@@ -70,7 +70,7 @@ export function ChatClient({ slug, shopName, initial, since }: { slug: string; s
       else if (!data.staff)
         setLines((l) => [
           ...l,
-          { id: tempId(), from: 'bot', kind: 'text', text: 'Dhonnobad! Amader shop team ekhane ektu porei reply debe.', products: [], orderNumber: null },
+          { id: tempId(), from: 'bot', kind: 'text', text: 'Dhonnobad! Amader shop team ekhane ektu porei reply debe.', products: [], orderNumber: null, mediaPath: null, mediaNote: '' },
         ]);
     } catch {
       setError('No connection. Try again.');
@@ -108,9 +108,15 @@ export function ChatClient({ slug, shopName, initial, since }: { slug: string; s
 
   return (
     <div className="mx-auto flex h-dvh max-w-2xl flex-col bg-zinc-50">
-      <header className="border-b border-zinc-200 bg-white px-4 py-3">
-        <p className="font-semibold">{shopName}</p>
-        <p className="text-xs text-zinc-500">AI sales assistant · Bangla, Banglish or English</p>
+      <header className="flex items-center gap-3 border-b border-zinc-200 bg-white px-4 py-3">
+        {logoUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={logoUrl} alt="" className="h-10 w-10 shrink-0 rounded-full border border-zinc-200 object-cover" />
+        )}
+        <div className="min-w-0">
+          <p className="truncate font-semibold">{shopName}</p>
+          <p className="text-xs text-zinc-500">AI sales assistant · Bangla, Banglish or English</p>
+        </div>
       </header>
 
       <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">

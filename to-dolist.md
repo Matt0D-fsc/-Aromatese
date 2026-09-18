@@ -1,6 +1,6 @@
 # ChatNab To-Do List
 
-Status as of 2026-09-17. Ordered by priority: work top to bottom.
+Status as of 2026-09-19. The pre-launch build scope lives in SCOPE.md; all three tiers are done. Ordered by priority: work top to bottom.
 
 ## Done so far
 - Multi-tenant Supabase backend (auth, row-level security per shop, migrations 001–008)
@@ -9,13 +9,14 @@ Status as of 2026-09-17. Ordered by priority: work top to bottom.
 - AI sales agent on a public chat link per shop (`/chat/<slug>`): Bangla/Banglish first, English fallback, product search, product cards, cash-on-delivery orders, photo understanding
 - Human takeover v1: AI asks for help, staff take over and reply, AI resumes after 5 min wait or 30 min staff idle
 - Live dashboard updates (Supabase Realtime)
+- Customer voice notes and photos are kept: stored in a private per-shop bucket, played back in the merchant inbox, and transcribed/described so the AI remembers them on later turns
 - AI engine switch in the admin panel: Gemini (.env) or in-house AI (OpenAI or Anthropic API format), with a connection and tool-calling test
 - Gemini key rotation and model fallback for testing; Mavs Gateway connected
 
 ## 1. Loose ends (this week)
 - [x] Commit recent work (migrations 007–008, AI engine switch, model fallback, Anthropic format, phone fix, AI fill fixes)
 - [ ] Hands-on test: merchant dashboard buttons (Take over, reply, Hand back, confirm/cancel order, product edit/delete)
-- [ ] Hands-on test: voice notes
+- [ ] Hands-on test: voice notes (webm/opus from a real phone; Gemini accepted the container in a synthetic test)
 - [ ] Hands-on test: merchant invite email
 - [ ] Hands-on test: ChatNab through Mavs Gateway (full order conversation, AI fill JSON output, forced fallback to Opus)
 - [ ] Clean up test data (Demo Shop BD, test orders, test conversations)
@@ -23,11 +24,12 @@ Status as of 2026-09-17. Ordered by priority: work top to bottom.
 ## 2. Must-have before the first real merchant
 - [ ] Deploy: hosting (e.g. Vercel) + domain + HTTPS (also enables the microphone on phones)
 - [ ] Email delivery (SMTP) for merchant invites and password resets
-- [ ] Shop policies for the AI: delivery charges/areas, delivery time, returns, payment options, business hours, FAQs (so the AI stops saying "the shop will confirm")
+- [x] Shop policies for the AI: delivery charges, delivery time, returns, payment, hours (shop profile)
 - [ ] Abuse protection on the public chat: per-IP rate limits and basic bot protection (current limit is per browser cookie)
-- [ ] Error monitoring (e.g. Sentry)
+- [x] Error monitoring (failures land in the audit trail and the admin panel; see DECISIONS.md)
 - [ ] Move the in-house AI API key into Supabase Vault
-- [ ] Privacy policy + a way to delete a customer's data
+- [x] Delete a customer's data (chat inbox) and purge old chats (admin panel)
+- [ ] Privacy policy page
 - [ ] Resolve the gateway upstream question (official Gemini/Anthropic APIs vs IDE access) before real customer data flows through it
 
 ## 3. What makes ChatNab sell in Bangladesh
@@ -43,17 +45,16 @@ Status as of 2026-09-17. Ordered by priority: work top to bottom.
   - [ ] Courier integration (Pathao, Steadfast, RedX)
   - [ ] Order status updates to the customer
   - [ ] Stock reservation so two customers can't buy the last item
-- [ ] Product variants (size, colour) — table exists, not used yet
+- [x] Product variants (size, colour): editable per product, and the AI quotes per-variant price and stock
 - [ ] Embeddable chat widget for merchant websites + QR code for the chat link
 
 ## 4. Growth features (later)
 - [ ] Payments: bKash and Nagad
-- [ ] Bulk product import (CSV or from a Facebook shop)
-- [ ] Staff accounts and assigning chats to staff
-- [ ] Merchant analytics: chats → orders conversion, most-asked products, AI vs staff handling
-- [ ] Save customer photos and voice notes in the merchant's chat history
+- [ ] Bulk product import (CSV in; CSV export is done)
+- [ ] Assigning chats to a particular staff member (staff accounts themselves are done)
+- [x] Merchant analytics: conversion, top products, unmatched searches, AI vs staff
 - [ ] Smarter search: by meaning and photo similarity for large catalogs
-- [ ] Platform owner: merchant billing and plans, AI cost per shop in taka, audit log
+- [x] Platform owner: plans and price per shop, AI cost in taka, audit log
 
 ## 5. Code health
 - [ ] Delete the old Express demo server and its 9 stale tests

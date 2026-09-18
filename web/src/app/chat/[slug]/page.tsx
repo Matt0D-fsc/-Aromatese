@@ -10,7 +10,7 @@ type Props = { params: Promise<{ slug: string }> };
 
 // Public page: the service role reads only this shop's name and this visitor's own thread (keyed by an httpOnly cookie).
 const getShop = cache(async (slug: string) => {
-  const { data } = await createAdminClient().from('tenants').select('id, name, status').eq('slug', slug).maybeSingle();
+  const { data } = await createAdminClient().from('tenants').select('id, name, status, logo_url').eq('slug', slug).maybeSingle();
   return data?.status === 'active' ? data : null;
 });
 
@@ -49,5 +49,5 @@ export default async function ChatPage({ params }: Props) {
     }
   }
 
-  return <ChatClient slug={slug} shopName={shop.name} initial={initial} since={initial.at(-1)?.createdAt ?? null} />;
+  return <ChatClient slug={slug} shopName={shop.name} logoUrl={shop.logo_url} initial={initial} since={initial.at(-1)?.createdAt ?? null} />;
 }

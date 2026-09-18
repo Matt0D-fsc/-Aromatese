@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireMerchant } from '@/lib/auth';
+import { audit } from '@/lib/audit';
 import { GEMINI_MODEL, generateContent } from '@/lib/gemini';
 import type { ProductInput } from './product-input';
 
@@ -60,12 +61,41 @@ export async function saveProduct(input: ProductInput): Promise<{ error: string 
   });
   if (error) return { error: error.code === '23505' ? 'Another product already uses this SKU.' : error.message };
 
+  // Variants are replaced wholesale rather than diffed: a handful of sizes per product makes matching rows
+  // up more code than simply writing the list the merchant just saw.
+  const variants = (Array.isArray(input.variants) ? input.variants : [])
+    .map((v) => ({
+      name: String(v?.name ?? '').trim().slice(0, 100),
+      price: v?.priceBdt === '' || v?.priceBdt == null ? null : Number(v.priceBdt),
+      stock: Math.floor(Number(v?.stockQuantity)),
+    }))
+    .filter((v) => v.name)
+    .slice(0, 50);
+  if (variants.some((v) => (v.price !== null && (!Number.isFinite(v.price) || v.price < 0)) || !Number.isInteger(v.stock) || v.stock < 0)) {
+    return { error: 'Each size or colour needs a whole-number stock, and a price of 0 or more if you set one.' };
+  }
+
+  await supabase.from('variants').delete().eq('product_id', input.id).eq('tenant_id', tenant.id);
+  if (variants.length) {
+    const { error: variantError } = await supabase.from('variants').insert(
+      variants.map((v) => ({
+        tenant_id: tenant.id,
+        product_id: input.id,
+        name: v.name,
+        sku: `${text(input.sku) ?? input.id.slice(0, 8).toUpperCase()}-${v.name.replace(/\s+/g, '-').toUpperCase().slice(0, 20)}`,
+        price_bdt: v.price,
+        stock_quantity: v.stock,
+      })),
+    );
+    if (variantError) return { error: variantError.message };
+  }
+
   revalidatePath('/dashboard');
   redirect('/dashboard');
 }
 
 export async function deleteProduct(id: string): Promise<{ error: string } | undefined> {
-  const { supabase, tenant } = await requireMerchant();
+  const { supabase, tenant, user } = await requireMerchant();
   if (tenant.status === 'suspended') return SUSPENDED;
   if (!UUID.test(id)) return { error: 'Invalid product.' };
 
@@ -75,6 +105,7 @@ export async function deleteProduct(id: string): Promise<{ error: string } | und
 
   const { error } = await supabase.from('products').delete().eq('id', id).eq('tenant_id', tenant.id);
   if (error) return { error: error.message };
+  await audit('product.deleted', { actorId: user.id, tenantId: tenant.id, detail: { productId: id, files: files?.length ?? 0 } });
 
   revalidatePath('/dashboard');
   redirect('/dashboard');

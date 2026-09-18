@@ -1,4 +1,8 @@
 // Form shape for a product. Numbers stay strings while editing so inputs can be empty; the server action parses them.
+
+// A size or a colour, with its own price and stock. Blank price means "same as the product".
+export type ProductVariant = { name: string; priceBdt: string; stockQuantity: string };
+
 export type ProductInput = {
   id: string;
   sku: string;
@@ -15,6 +19,7 @@ export type ProductInput = {
   isActive: boolean;
   voiceTags: string[];
   imageUrls: string[];
+  variants: ProductVariant[];
 };
 
 export type ProductRow = {
@@ -33,6 +38,7 @@ export type ProductRow = {
   is_active: boolean;
   voice_tags: string[] | null;
   image_urls: string[] | null;
+  variants?: { id: string; name: string; price_bdt: number | null; stock_quantity: number }[] | null;
 };
 
 export const emptyProduct = (id: string): ProductInput => ({
@@ -51,6 +57,7 @@ export const emptyProduct = (id: string): ProductInput => ({
   isActive: true,
   voiceTags: [],
   imageUrls: [],
+  variants: [],
 });
 
 export const toProductInput = (p: ProductRow): ProductInput => ({
@@ -69,4 +76,9 @@ export const toProductInput = (p: ProductRow): ProductInput => ({
   isActive: p.is_active,
   voiceTags: p.voice_tags ?? [],
   imageUrls: p.image_urls ?? [],
+  variants: (p.variants ?? []).map((v) => ({
+    name: v.name,
+    priceBdt: v.price_bdt == null ? '' : String(v.price_bdt),
+    stockQuantity: String(v.stock_quantity),
+  })),
 });
