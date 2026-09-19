@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireMerchant } from '@/lib/auth';
-import { audit } from '@/lib/audit';
+import { audit, throwAudited } from '@/lib/audit';
 import { GEMINI_MODEL, generateContent } from '@/lib/gemini';
 import type { ProductInput } from './product-input';
 
@@ -93,6 +93,24 @@ export async function saveProduct(input: ProductInput): Promise<{ error: string 
 
   revalidatePath('/dashboard', 'layout');
   redirect('/dashboard/products');
+}
+
+// Today's stock from the list, without opening the product. Only for products without sizes: those keep stock
+// per variant, and a single number here would disagree with them.
+export async function updateStock(id: string, formData: FormData) {
+  const { supabase, tenant, user } = await requireMerchant();
+  if (tenant.status === 'suspended') throw new Error('Your shop is suspended.');
+  const stock = Number(formData.get('stock'));
+  if (!UUID.test(id) || !Number.isInteger(stock) || stock < 0) throw new Error('Stock must be a whole number (0 or more).');
+
+  const { error } = await supabase
+    .from('products')
+    .update({ stock_quantity: stock, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('tenant_id', tenant.id);
+  if (error) await throwAudited('product.stock', error, { actorId: user.id, tenantId: tenant.id, detail: { productId: id, stock } });
+  await audit('product.stock_changed', { actorId: user.id, tenantId: tenant.id, detail: { productId: id, stock } });
+  revalidatePath('/dashboard/products');
 }
 
 export async function deleteProduct(id: string): Promise<{ error: string } | undefined> {

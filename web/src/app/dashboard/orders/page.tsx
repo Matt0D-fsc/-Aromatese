@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { requireMerchant } from '@/lib/auth';
 import { t } from '@/lib/i18n';
 import { getLang } from '@/lib/i18n-server';
-import { btn, btnDanger, btnGhost, card, input, statusBadge } from '@/components/ui';
+import { btn, btnDanger, btnGhost, card, errorBox, input, statusBadge } from '@/components/ui';
 import { dhakaTime, searchTerm, taka } from '@/lib/chat';
 import { setOrderStatus } from './actions';
 
@@ -24,11 +24,11 @@ const FILTERS = { all: 'All', draft: 'New', confirmed: 'Confirmed', cancelled: '
 type Filter = keyof typeof FILTERS;
 const PAGE_SIZE = 20;
 
-export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ f?: string; q?: string; p?: string }> }) {
+export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ f?: string; q?: string; p?: string; stock?: string }> }) {
   const [{ supabase, tenant }, lang] = await Promise.all([requireMerchant(), getLang()]);
   if (!tenant.onboarding_completed_at) redirect('/dashboard/onboarding');
 
-  const { f, q, p } = await searchParams;
+  const { f, q, p, stock } = await searchParams;
   const filter: Filter = f && f in FILTERS ? (f as Filter) : 'all';
   const search = searchTerm(q);
   const page = Math.max(1, Number(p) || 1);
@@ -64,6 +64,12 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         <h1 className="text-2xl font-semibold">{t(lang, 'orders.title')}</h1>
         <p className="mt-1 text-sm text-zinc-500">{t(lang, 'orders.subtitle')}</p>
       </div>
+
+      {stock && (
+        <p className={errorBox} role="alert">
+          {stock.slice(0, 200)}. The order was not confirmed. Update the stock in Products, or call the customer to change the order.
+        </p>
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <nav className="flex flex-wrap gap-2 text-sm">
@@ -156,6 +162,16 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                     <button className={btnDanger}>{t(lang, 'orders.cancel')}</button>
                   </form>
                 </div>
+              )}
+              {/* A refused delivery or a customer who changed their mind. Two steps, because it moves stock back. */}
+              {o.status === 'confirmed' && tenant.status !== 'suspended' && (
+                <details className="text-sm">
+                  <summary className="cursor-pointer text-zinc-500 hover:text-foreground">Cancel this order</summary>
+                  <form action={setOrderStatus.bind(null, o.id, 'cancelled')} className="mt-2 flex flex-wrap items-center gap-2">
+                    <span className="text-zinc-600">The items go back into stock.</span>
+                    <button className={btnDanger}>Cancel order</button>
+                  </form>
+                </details>
               )}
             </li>
           ))}
