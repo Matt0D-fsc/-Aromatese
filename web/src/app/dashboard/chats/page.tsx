@@ -79,7 +79,7 @@ export default async function ChatsPage({ searchParams }: { searchParams: Promis
           <Link
             key={key}
             href={href({ f: key })}
-            className={`rounded-full px-3 py-1 ${key === filter ? 'bg-zinc-900 text-white' : 'bg-white ring-1 ring-zinc-200 hover:bg-zinc-100'}`}
+            className={`rounded-full px-3 py-1 ${key === filter ? 'bg-foreground text-background' : 'bg-surface ring-1 ring-zinc-200 hover:bg-zinc-100'}`}
           >
             {FILTERS[key]}
           </Link>
@@ -93,16 +93,16 @@ export default async function ChatsPage({ searchParams }: { searchParams: Promis
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-[18rem_1fr]">
-          <ul className={`${card} max-h-[70vh] divide-y divide-zinc-100 overflow-y-auto p-0 ${c ? 'hidden lg:block' : ''}`}>
+          <ul className={`${card} max-h-[70vh] divide-y divide-line overflow-y-auto p-0 ${c ? 'hidden lg:block' : ''}`}>
             {conversations.map((conv) => (
               <li key={conv.id}>
                 <Link href={href({ c: conv.id })} className={`block px-4 py-3 text-sm hover:bg-zinc-50 ${conv.id === active.id ? 'bg-zinc-100' : ''}`}>
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-medium">{who(conv)}</p>
                     {conv.needs_human ? (
-                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">Needs you</span>
+                      <span className="rounded-full bg-warning-soft px-2 py-0.5 text-[11px] font-medium text-warning-strong">Needs you</span>
                     ) : conv.ai_muted ? (
-                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800">Staff</span>
+                      <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-strong">Staff</span>
                     ) : null}
                   </div>
                   <p className="text-xs text-zinc-500">
@@ -148,7 +148,7 @@ export default async function ChatsPage({ searchParams }: { searchParams: Promis
             </div>
 
             {active.needs_human && (
-              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              <p className="rounded-control border border-warning/30 bg-warning-soft px-3 py-2 text-sm text-warning-strong">
                 AI asked for help: {active.handoff_reason ?? 'Customer needs a person'}
               </p>
             )}
@@ -158,17 +158,17 @@ export default async function ChatsPage({ searchParams }: { searchParams: Promis
                 const line = toChatLine(m);
                 const fromCustomer = line.from === 'customer';
                 const mediaUrl = line.mediaPath ? mediaUrls.get(line.mediaPath) : undefined;
-                const tone = fromCustomer ? 'bg-zinc-100' : line.from === 'agent' ? 'bg-emerald-700 text-white' : 'bg-zinc-900 text-white';
+                const tone = fromCustomer ? 'bg-zinc-100' : line.from === 'agent' ? 'bg-accent text-accent-foreground' : 'bg-foreground text-background';
                 return (
                   <div key={line.id} className={`flex ${fromCustomer ? 'justify-start' : 'justify-end'}`}>
-                    <div className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-sm ${tone}`}>
+                    <div className={`max-w-[85%] rounded-card px-3.5 py-2 text-sm ${tone}`}>
                       {!fromCustomer && (
                         <p className="text-[10px] font-semibold uppercase tracking-wide opacity-70">{line.from === 'agent' ? 'Team' : 'AI'}</p>
                       )}
                       {line.kind === 'audio' && mediaUrl && <audio controls preload="none" src={mediaUrl} className="mb-1 max-w-full" />}
                       {line.kind === 'image' && mediaUrl && (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={mediaUrl} alt={line.mediaNote || 'Photo the customer sent'} className="mb-1 max-h-48 rounded-lg" />
+                        <img src={mediaUrl} alt={line.mediaNote || 'Photo the customer sent'} className="mb-1 max-h-48 rounded-chip" />
                       )}
                       {line.kind !== 'text' && !mediaUrl && (
                         <p className="flex items-center gap-1.5 opacity-70">
@@ -181,7 +181,7 @@ export default async function ChatsPage({ searchParams }: { searchParams: Promis
                       {line.products.length > 0 && (
                         <p className="mt-1 text-xs opacity-80">Showed: {line.products.map((p) => `${p.title} (${taka(p.price)})`).join(', ')}</p>
                       )}
-                      {line.orderNumber && <p className="mt-1 text-xs font-semibold text-emerald-300">Order {line.orderNumber} placed</p>}
+                      {line.orderNumber && <p className="mt-1 text-xs font-semibold text-accent-soft">Order {line.orderNumber} placed</p>}
                       <p className="mt-1 text-[10px] opacity-60">{dhakaTime(m.created_at)}</p>
                     </div>
                   </div>
@@ -208,8 +208,8 @@ export default async function ChatsPage({ searchParams }: { searchParams: Promis
                 {active.customers?.id && (
                   <details className="text-xs text-zinc-500">
                     <summary className="cursor-pointer select-none hover:text-zinc-900">Customer asked to be forgotten?</summary>
-                    <div className="mt-2 space-y-2 rounded-lg border border-red-200 bg-red-50 p-3">
-                      <p className="text-red-800">
+                    <div className="mt-2 space-y-2 rounded-control border border-danger/25 bg-danger-soft p-3">
+                      <p className="text-danger-strong">
                         Deletes this chat, its voice notes and photos, and the customer&apos;s name and number. Their orders stay, without personal
                         details. This cannot be undone.
                       </p>

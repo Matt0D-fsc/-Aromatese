@@ -303,7 +303,7 @@ export function ChatClient({ slug, shopName, logoUrl, aiActive, policies, initia
               {line.from === 'agent' && <p className="mb-0.5 text-xs font-semibold text-accent-strong">Team member</p>}
               {line.localUrl && line.kind === 'image' && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={line.localUrl} alt="Your photo" className="mb-1 max-h-48 rounded-lg" />
+                <img src={line.localUrl} alt="Your photo" className="mb-1 max-h-48 rounded-chip" />
               )}
               {line.localUrl && line.kind === 'audio' && <audio controls src={line.localUrl} className="max-w-full" />}
               {!line.localUrl && line.kind !== 'text' && (
@@ -437,7 +437,7 @@ function Bubble({ mine, children }: { mine: boolean; children: React.ReactNode }
   return (
     <div className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-[15px] leading-relaxed ${
+        className={`max-w-[85%] rounded-card px-3.5 py-2 text-[15px] leading-relaxed ${
           mine ? 'rounded-br-sm bg-accent text-accent-foreground' : 'rounded-bl-sm border border-line bg-surface text-foreground'
         }`}
       >

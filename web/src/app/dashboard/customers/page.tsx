@@ -97,7 +97,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
 
           <div className={`${card} hidden overflow-x-auto p-0 sm:block`}>
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-zinc-200 text-xs uppercase tracking-wide text-zinc-500">
+              <thead className="border-b border-line text-xs uppercase tracking-wide text-zinc-500">
                 <tr>
                   <th className="px-6 py-3">Name</th>
                   <th className="px-3 py-3">Phone</th>
@@ -107,7 +107,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                   <th className="px-6 py-3 text-right">Chat</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-100">
+              <tbody className="divide-y divide-line">
                 {customers.map((c) => (
                   <tr key={c.id}>
                     <td className="px-6 py-3 font-medium">{c.name || <span className="font-normal text-zinc-400">Not given yet</span>}</td>

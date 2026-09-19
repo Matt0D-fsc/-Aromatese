@@ -10,7 +10,7 @@ export default async function OnboardingPage() {
     <div className="mx-auto max-w-2xl space-y-6">
       {firstTime && (
         <ol className="flex gap-3 text-sm">
-          <li className="rounded-full bg-zinc-900 px-3 py-1 text-white">1. Shop details</li>
+          <li className="rounded-full bg-foreground px-3 py-1 text-background">1. Shop details</li>
           <li className="rounded-full bg-zinc-200 px-3 py-1 text-zinc-600">2. Add products</li>
         </ol>
       )}

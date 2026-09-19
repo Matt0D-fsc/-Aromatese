@@ -44,7 +44,7 @@ export function ShopForm({ tenant }: { tenant: Tenant }) {
         <span className={label}>Logo</span>
         <input type="hidden" name="logoUrl" value={logoUrl} />
         <div className="flex items-center gap-3">
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-card border border-line bg-zinc-50">
             {logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={logoUrl} alt="Your shop logo" className="h-full w-full object-cover" />
@@ -67,7 +67,7 @@ export function ShopForm({ tenant }: { tenant: Tenant }) {
             />
           </label>
           {logoUrl && (
-            <button type="button" className="text-sm text-zinc-500 hover:text-red-600" onClick={() => setLogoUrl('')}>
+            <button type="button" className="text-sm text-zinc-500 hover:text-danger" onClick={() => setLogoUrl('')}>
               Remove
             </button>
           )}
@@ -92,7 +92,7 @@ export function ShopForm({ tenant }: { tenant: Tenant }) {
         <textarea className={input} id="address" name="address" rows={2} defaultValue={tenant.address ?? ''} placeholder="House 12, Road 5, Dhanmondi, Dhaka" />
         <p className={hint}>Optional. Used later for courier pickup.</p>
       </div>
-      <fieldset className="space-y-5 border-t border-zinc-200 pt-5">
+      <fieldset className="space-y-5 border-t border-line pt-5">
         <legend className="sr-only">Shop policies</legend>
         <div>
           <h2 className="font-medium">What your AI is allowed to promise</h2>

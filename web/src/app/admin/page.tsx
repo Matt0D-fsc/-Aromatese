@@ -124,7 +124,7 @@ export default async function AdminPage() {
 
         <section className={`${card} overflow-x-auto p-0`}>
           <table className="w-full min-w-[68rem] text-left text-sm">
-            <thead className="border-b border-zinc-200 text-xs uppercase tracking-wide text-zinc-500">
+            <thead className="border-b border-line text-xs uppercase tracking-wide text-zinc-500">
               <tr>
                 <th className="px-6 py-3">Merchant</th>
                 <th className="px-3 py-3">Status</th>
@@ -138,7 +138,7 @@ export default async function AdminPage() {
                 <th className="px-6 py-3 text-right">Access</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-100">
+            <tbody className="divide-y divide-line">
               {tenants.length === 0 && (
                 <tr>
                   <td colSpan={10} className="px-6 py-10 text-center text-zinc-500">No merchants yet. Invite your first one above.</td>
@@ -154,7 +154,7 @@ export default async function AdminPage() {
                       <Link href={`/admin/tenants/${t.id}`} className="font-medium hover:underline">{t.name}</Link>
                       <div className="text-xs text-zinc-500">{t.contact_email}</div>
                       {!t.onboarding_completed_at ? (
-                        <div className="text-xs text-amber-600">Setup not finished</div>
+                        <div className="text-xs text-warning">Setup not finished</div>
                       ) : (
                         <Link href={`/chat/${t.slug}`} target="_blank" className="text-xs underline">Open chat ↗</Link>
                       )}
@@ -167,7 +167,7 @@ export default async function AdminPage() {
                       </div>
                     </td>
                     <td className="px-3 py-4 tabular-nums">{t.products[0]?.count ?? 0}</td>
-                    <td className={`px-3 py-4 tabular-nums ${overLimit ? 'font-semibold text-red-600' : ''}`}>
+                    <td className={`px-3 py-4 tabular-nums ${overLimit ? 'font-semibold text-danger' : ''}`}>
                       {used.toLocaleString()}
                       <span className="text-zinc-400"> / {t.monthly_message_limit.toLocaleString()}</span>
                     </td>
@@ -225,16 +225,16 @@ export default async function AdminPage() {
           {activity.length === 0 ? (
             <p className="py-6 text-center text-sm text-zinc-500">Nothing recorded yet.</p>
           ) : (
-            <ul className="divide-y divide-zinc-100 text-sm">
+            <ul className="divide-y divide-line text-sm">
               {activity.map((a) => {
                 const failed = a.event_type.startsWith('error.');
                 return (
                   <li key={a.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-2">
                     <span className="flex flex-wrap items-baseline gap-2">
-                      <code className={`rounded px-1.5 py-0.5 text-xs ${failed ? 'bg-red-50 text-red-700' : 'bg-zinc-100 text-zinc-700'}`}>{a.event_type}</code>
+                      <code className={`rounded-chip px-1.5 py-0.5 text-xs ${failed ? 'bg-danger-soft text-danger-strong' : 'bg-zinc-100 text-zinc-700'}`}>{a.event_type}</code>
                       {a.tenant_id && <span className="text-zinc-600">{shopName.get(a.tenant_id) ?? 'deleted shop'}</span>}
                       {a.actor_id && <span className="text-zinc-500">{actorEmail.get(a.actor_id) ?? 'unknown user'}</span>}
-                      {a.detail?.message != null && <span className="text-red-600">{String(a.detail.message).slice(0, 160)}</span>}
+                      {a.detail?.message != null && <span className="text-danger">{String(a.detail.message).slice(0, 160)}</span>}
                     </span>
                     <span className="text-xs text-zinc-400">{dhakaTime(a.created_at)}</span>
                   </li>

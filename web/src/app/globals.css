@@ -42,10 +42,12 @@
   --color-accent-strong: oklch(0.43 0.08 168);
 
   --color-warning: oklch(0.59 0.12 70);
+  --color-warning-foreground: oklch(1 0 0);
   --color-warning-soft: oklch(0.96 0.03 80);
   --color-warning-strong: oklch(0.45 0.1 70);
 
   --color-danger: oklch(0.51 0.14 30);
+  --color-danger-foreground: oklch(1 0 0);
   --color-danger-soft: oklch(0.955 0.02 30);
   --color-danger-strong: oklch(0.42 0.12 30);
 
@@ -76,10 +78,12 @@
     --color-accent-strong: oklch(0.85 0.1 168);
 
     --color-warning: oklch(0.76 0.13 70);
+    --color-warning-foreground: oklch(0.17 0.006 75);
     --color-warning-soft: oklch(0.28 0.05 70);
     --color-warning-strong: oklch(0.86 0.11 70);
 
     --color-danger: oklch(0.71 0.13 30);
+    --color-danger-foreground: oklch(0.17 0.006 75);
     --color-danger-soft: oklch(0.28 0.05 30);
     --color-danger-strong: oklch(0.82 0.11 30);
 

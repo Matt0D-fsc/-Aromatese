@@ -88,7 +88,7 @@ export default async function AnalyticsPage() {
                   {/* Plain divs, no chart library: two numbers a day do not need one. */}
                   <span className="h-2 rounded-sm bg-zinc-900" style={{ width: `${(Number(d.chats) / busiest) * 100}%` }} aria-hidden />
                   <span className="tabular-nums text-zinc-500">{d.chats}</span>
-                  {Number(d.orders) > 0 && <span className="rounded bg-emerald-50 px-1.5 py-0.5 font-medium text-emerald-700">{d.orders} ordered</span>}
+                  {Number(d.orders) > 0 && <span className="rounded-chip bg-accent-soft px-1.5 py-0.5 font-medium text-accent-strong">{d.orders} ordered</span>}
                 </span>
               </li>
             ))}
@@ -103,7 +103,7 @@ export default async function AnalyticsPage() {
           {unmatched.length === 0 ? (
             <p className="py-6 text-center text-sm text-zinc-500">Nothing yet. Every search has found something.</p>
           ) : (
-            <ul className="divide-y divide-zinc-100 text-sm">
+            <ul className="divide-y divide-line text-sm">
               {unmatched.map((u) => (
                 <li key={u.query} className="flex items-baseline justify-between gap-3 py-2">
                   <span className="font-medium">{u.query}</span>
@@ -122,7 +122,7 @@ export default async function AnalyticsPage() {
           {topProducts.length === 0 ? (
             <p className="py-6 text-center text-sm text-zinc-500">No products have been shown yet.</p>
           ) : (
-            <ul className="divide-y divide-zinc-100 text-sm">
+            <ul className="divide-y divide-line text-sm">
               {topProducts.map((p) => (
                 <li key={p.product_id} className="flex items-baseline justify-between gap-3 py-2">
                   <Link href={`/dashboard/products/${p.product_id}`} className="font-medium hover:underline">
@@ -163,7 +163,7 @@ export default async function AnalyticsPage() {
           <>
             <div className="flex h-3 overflow-hidden rounded-full bg-zinc-100">
               <div className="bg-zinc-900" style={{ width: `${(total.ai / handled) * 100}%` }} aria-hidden />
-              <div className="bg-emerald-600" style={{ width: `${(total.staff / handled) * 100}%` }} aria-hidden />
+              <div className="bg-accent" style={{ width: `${(total.staff / handled) * 100}%` }} aria-hidden />
             </div>
             <div className="mt-2 flex flex-wrap gap-4 text-sm text-zinc-600">
               <span>
@@ -171,7 +171,7 @@ export default async function AnalyticsPage() {
                 AI {total.ai.toLocaleString()} ({Math.round((total.ai / handled) * 100)}%)
               </span>
               <span>
-                <span className="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-600" />
+                <span className="mr-1 inline-block h-2 w-2 rounded-full bg-accent" />
                 Your team {total.staff.toLocaleString()}
               </span>
             </div>

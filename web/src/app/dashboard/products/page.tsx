@@ -52,7 +52,7 @@ export default async function ProductsPage() {
                   <div className="space-y-1 p-4">
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-medium leading-snug">{p.title_en}</p>
-                      {!p.is_active && <span className="shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-500">{t(lang, 'products.hidden')}</span>}
+                      {!p.is_active && <span className="shrink-0 rounded-chip bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-500">{t(lang, 'products.hidden')}</span>}
                     </div>
                     {p.title_bn && <p className="text-sm text-zinc-500">{p.title_bn}</p>}
                     <div className="flex items-center justify-between pt-1 text-sm">

@@ -70,7 +70,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             <Link
               key={key}
               href={href({ f: key, p: 1 })}
-              className={`rounded-full px-3 py-1 ${key === filter ? 'bg-zinc-900 text-white' : 'bg-white ring-1 ring-zinc-200 hover:bg-zinc-100'}`}
+              className={`rounded-full px-3 py-1 ${key === filter ? 'bg-foreground text-background' : 'bg-surface ring-1 ring-zinc-200 hover:bg-zinc-100'}`}
             >
               {FILTERS[key]}
             </Link>

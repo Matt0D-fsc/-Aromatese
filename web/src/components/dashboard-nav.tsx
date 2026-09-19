@@ -32,7 +32,7 @@ export function TopNav({ links }: { links: NavLink[] }) {
           >
             {link.label}
             {!!link.badge && (
-              <span className="ml-1.5 rounded-full bg-warning px-1.5 py-0.5 text-[11px] font-semibold text-white">{link.badge}</span>
+              <span className="ml-1.5 rounded-full bg-warning px-1.5 py-0.5 text-[11px] font-semibold text-warning-foreground">{link.badge}</span>
             )}
           </Link>
         );
@@ -62,7 +62,7 @@ export function BottomTabs({ links }: { links: NavLink[] }) {
             <Icon size={21} />
             <span className={`text-[11px] ${current ? 'font-semibold' : 'font-medium'}`}>{link.label}</span>
             {!!link.badge && (
-              <span className="absolute left-1/2 top-1.5 ml-2 flex min-w-[17px] items-center justify-center rounded-full bg-warning px-1 text-[10px] font-bold text-white">
+              <span className="absolute left-1/2 top-1.5 ml-2 flex min-w-[17px] items-center justify-center rounded-full bg-warning px-1 text-[10px] font-bold text-warning-foreground">
                 {link.badge}
               </span>
             )}

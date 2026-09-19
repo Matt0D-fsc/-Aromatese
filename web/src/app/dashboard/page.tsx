@@ -174,7 +174,7 @@ export default async function HomePage() {
 
       {/* The tab bar holds the five daily places. Everything else is reachable from here, so nothing is
           stranded on a phone. */}
-      <section className={`${card} divide-y divide-zinc-100 p-0 sm:hidden`}>
+      <section className={`${card} divide-y divide-line p-0 sm:hidden`}>
         {[
           ['/dashboard/customers', t(lang, 'nav.customers')],
           ['/dashboard/staff', t(lang, 'nav.team')],

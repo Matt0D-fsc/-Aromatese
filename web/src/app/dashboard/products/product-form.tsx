@@ -127,20 +127,20 @@ export function ProductForm({ tenantId, product, isNew }: { tenantId: string; pr
             <p className={`${hint} mb-4`}>The first photo is the cover. The AI sends these to customers and uses them to recognise products from customer photos.</p>
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
               {form.imageUrls.map((url, i) => (
-                <div key={url} className="group relative aspect-square overflow-hidden rounded-lg border border-zinc-200 bg-zinc-100">
+                <div key={url} className="group relative aspect-square overflow-hidden rounded-chip border border-line bg-zinc-100">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={url} alt={`Product photo ${i + 1}`} className="h-full w-full object-cover" />
-                  {i === 0 && <span className="absolute left-1 top-1 rounded bg-zinc-900/80 px-1.5 py-0.5 text-[10px] text-white">Cover</span>}
+                  {i === 0 && <span className="absolute left-1 top-1 rounded-chip bg-foreground/80 px-1.5 py-0.5 text-[10px] text-background">Cover</span>}
                   <div className="absolute inset-x-1 bottom-1 flex justify-between gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
                     {i !== 0 && (
-                      <button type="button" onClick={() => makeCover(url)} className="rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-medium">Cover</button>
+                      <button type="button" onClick={() => makeCover(url)} className="rounded-chip bg-surface/90 px-1.5 py-0.5 text-[10px] font-medium">Cover</button>
                     )}
-                    <button type="button" onClick={() => removePhoto(url)} className="ml-auto rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-medium text-red-700">Remove</button>
+                    <button type="button" onClick={() => removePhoto(url)} className="ml-auto rounded-chip bg-surface/90 px-1.5 py-0.5 text-[10px] font-medium text-danger-strong">Remove</button>
                   </div>
                 </div>
               ))}
               {form.imageUrls.length < MAX_PHOTOS && (
-                <label className="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-zinc-300 text-center text-xs text-zinc-500 hover:border-zinc-500 hover:text-zinc-800">
+                <label className="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-chip border-2 border-dashed border-zinc-300 text-center text-xs text-zinc-500 hover:border-zinc-500 hover:text-zinc-800">
                   <span className="text-2xl leading-none">+</span>
                   {uploading ? 'Uploading…' : 'Add photos'}
                   <input
@@ -241,7 +241,7 @@ export function ProductForm({ tenantId, product, isNew }: { tenantId: string; pr
                     <button
                       type="button"
                       onClick={() => setForm((f) => ({ ...f, variants: f.variants.filter((_, x) => x !== i) }))}
-                      className="rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-red-600"
+                      className="rounded-control text-zinc-400 hover:bg-zinc-100 hover:text-danger"
                       aria-label={`Remove ${v.name || `size ${i + 1}`}`}
                     >
                       ✕

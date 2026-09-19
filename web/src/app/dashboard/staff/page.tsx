@@ -33,7 +33,7 @@ export default async function StaffPage() {
       </section>
 
       <section className={`${card} p-0`}>
-        <ul className="divide-y divide-zinc-100">
+        <ul className="divide-y divide-line">
           {members.map((m) => {
             const profile = profiles.get(m.user_id);
             const isMe = m.user_id === user.id;

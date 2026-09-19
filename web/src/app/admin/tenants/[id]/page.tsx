@@ -67,7 +67,7 @@ export default async function AdminTenantPage({ params, searchParams }: { params
           </Link>
           <h1 className="mt-1 flex flex-wrap items-center gap-2 text-2xl font-semibold">
             {tenant.name} <span className={statusBadge(tenant.status)}>{tenant.status}</span>
-            {!tenant.ai_enabled && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-200">AI paused</span>}
+            {!tenant.ai_enabled && <span className="rounded-full bg-warning-soft px-2 py-0.5 text-xs font-medium text-warning-strong ring-1 ring-inset ring-warning/30">AI paused</span>}
           </h1>
         </div>
         <Link href={`/chat/${tenant.slug}`} target="_blank" className={btnGhost}>
@@ -172,7 +172,7 @@ export default async function AdminTenantPage({ params, searchParams }: { params
         {conversations.length === 0 ? (
           <p className="py-4 text-sm text-zinc-500">No chats yet.</p>
         ) : (
-          <ul className="divide-y divide-zinc-100 text-sm">
+          <ul className="divide-y divide-line text-sm">
             {conversations.map((conv) => (
               <li key={conv.id} className="flex flex-wrap items-baseline justify-between gap-2 py-2">
                 <span className="flex flex-wrap items-baseline gap-2">
@@ -180,8 +180,8 @@ export default async function AdminTenantPage({ params, searchParams }: { params
                     {conv.customers?.name || conv.customers?.phone || `Visitor ${conv.id.slice(0, 6)}`}
                   </Link>
                   <span className="text-xs text-zinc-500">{conv.channel}</span>
-                  {conv.needs_human && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">Needs them</span>}
-                  {conv.ai_muted && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800">Staff</span>}
+                  {conv.needs_human && <span className="rounded-full bg-warning-soft px-2 py-0.5 text-[11px] font-medium text-warning-strong">Needs them</span>}
+                  {conv.ai_muted && <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-strong">Staff</span>}
                 </span>
                 <span className="text-xs text-zinc-400">{dhakaTime(conv.last_message_at)}</span>
               </li>
@@ -201,8 +201,8 @@ export default async function AdminTenantPage({ params, searchParams }: { params
                 return (
                   <div key={line.id} className={`flex ${fromCustomer ? 'justify-start' : 'justify-end'}`}>
                     <div
-                      className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
-                        fromCustomer ? 'bg-zinc-100' : line.from === 'agent' ? 'bg-emerald-700 text-white' : 'bg-zinc-900 text-white'
+                      className={`max-w-[85%] rounded-card px-3 py-2 text-sm ${
+                        fromCustomer ? 'bg-zinc-100' : line.from === 'agent' ? 'bg-accent text-accent-foreground' : 'bg-foreground text-background'
                       }`}
                     >
                       {!fromCustomer && <p className="text-[10px] font-semibold uppercase opacity-70">{line.from === 'agent' ? 'Team' : 'AI'}</p>}
@@ -230,7 +230,7 @@ export default async function AdminTenantPage({ params, searchParams }: { params
           {orders.length === 0 ? (
             <p className="py-4 text-sm text-zinc-500">No orders yet.</p>
           ) : (
-            <ul className="divide-y divide-zinc-100 text-sm">
+            <ul className="divide-y divide-line text-sm">
               {orders.map((o) => (
                 <li key={o.id} className="flex flex-wrap items-baseline justify-between gap-2 py-2">
                   <span>
@@ -251,10 +251,10 @@ export default async function AdminTenantPage({ params, searchParams }: { params
           {activity.length === 0 ? (
             <p className="py-4 text-sm text-zinc-500">Nothing recorded for this shop yet.</p>
           ) : (
-            <ul className="divide-y divide-zinc-100 text-sm">
+            <ul className="divide-y divide-line text-sm">
               {activity.map((a) => (
                 <li key={a.id} className="flex flex-wrap items-baseline justify-between gap-2 py-2">
-                  <code className={`rounded px-1.5 py-0.5 text-xs ${a.event_type.startsWith('error.') ? 'bg-red-50 text-red-700' : 'bg-zinc-100 text-zinc-700'}`}>
+                  <code className={`rounded-chip px-1.5 py-0.5 text-xs ${a.event_type.startsWith('error.') ? 'bg-danger-soft text-danger-strong' : 'bg-zinc-100 text-zinc-700'}`}>
                     {a.event_type}
                   </code>
                   <span className="text-xs text-zinc-400">{dhakaTime(a.created_at)}</span>
