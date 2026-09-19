@@ -7,6 +7,7 @@ import { autofillProduct, deleteProduct, saveProduct } from './actions';
 import type { ProductInput } from './product-input';
 import { btn, btnDanger, btnGhost, card, errorBox, hint, input, label, noticeBox } from '@/components/ui';
 import { SparkIcon } from '@/components/icons';
+import { shrinkImage } from '@/lib/shrink-image';
 
 const MAX_PHOTOS = 10;
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
@@ -37,7 +38,8 @@ export function ProductForm({ tenantId, product, isNew }: { tenantId: string; pr
     setError('');
     const supabase = createClient();
     const urls: string[] = [];
-    for (const file of picked.slice(0, room)) {
+    for (const original of picked.slice(0, room)) {
+      const file = await shrinkImage(original);
       if (file.size > MAX_PHOTO_BYTES) {
         setError(`${file.name} is larger than 5 MB.`);
         continue;

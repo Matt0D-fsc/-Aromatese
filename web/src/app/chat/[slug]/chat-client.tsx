@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { mediaLabel, taka, type ChatLine, type ChatProduct } from '@/lib/chat';
 import { CheckIcon, CloseIcon, InfoIcon, MicIcon, PhotoIcon, SendIcon } from '@/components/icons';
 import { POLICY_FIELDS, policyChips, type ShopPolicies } from '@/lib/policies';
+import { shrinkImage } from '@/lib/shrink-image';
 
 const MAX_RECORD_MS = 60_000;
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
@@ -82,9 +83,10 @@ export function ChatClient({ slug, shopName, logoUrl, aiActive, policies, initia
     };
   }, []);
 
-  async function send(text: string, file?: File) {
+  async function send(text: string, photoOrVoice?: File) {
     const clean = text.trim();
-    if (busy || (!clean && !file)) return;
+    if (busy || (!clean && !photoOrVoice)) return;
+    const file = photoOrVoice?.type.startsWith('image/') ? await shrinkImage(photoOrVoice) : photoOrVoice;
     if (file && file.size > MAX_FILE_BYTES) return setError('File is too large (max 5 MB).');
 
     const kind = file ? (file.type.startsWith('audio/') ? 'audio' : 'image') : 'text';
