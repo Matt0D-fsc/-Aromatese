@@ -2,11 +2,12 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireAdmin } from '@/lib/auth';
 import { MicIcon, PhotoIcon } from '@/components/icons';
-import { btnGhost, card, input, statusBadge } from '@/components/ui';
+import { btnGhost, card, hint, input, label, statusBadge } from '@/components/ui';
 import { dhakaTime, mediaLabel, taka, toChatLine, MESSAGE_COLUMNS, type MessageRow } from '@/lib/chat';
 import { POLICY_FIELDS, readPolicies } from '@/lib/policies';
 import { getAiSettings } from '@/lib/ai-settings';
-import { updatePlan } from '../../actions';
+import { saveAiPersona, updatePlan } from '../../actions';
+import { readPersona, readPlaybook } from '@/lib/ai-profile';
 import { PLANS } from '@/lib/plans';
 
 // One shop, read-only, for when a merchant says "the AI told my customer something wrong". The platform admin
@@ -16,6 +17,7 @@ type Tenant = {
   id: string; name: string; slug: string; status: string; contact_email: string | null; contact_phone: string | null;
   business_category: string | null; address: string | null; monthly_message_limit: number; ai_enabled: boolean;
   onboarding_completed_at: string | null; created_at: string; policies: unknown; plan: string; plan_price_bdt: number;
+  ai_persona: unknown; ai_playbook: unknown;
 };
 type OrderRow = { id: string; order_number: string; status: string; total_bdt: number; created_at: string; shipping_address: { name?: string; phone?: string } };
 type ConversationRow = { id: string; channel: string; last_message_at: string; needs_human: boolean; ai_muted: boolean; customers: { name: string | null; phone: string | null } | null };
@@ -30,6 +32,8 @@ export default async function AdminTenantPage({ params, searchParams }: { params
   if (!tenantRow) notFound();
   const tenant = tenantRow as Tenant;
   const policies = readPolicies(tenant.policies);
+  const persona = readPersona(tenant.ai_persona);
+  const playbook = readPlaybook(tenant.ai_playbook);
 
   const [{ data: usage }, { data: orderRows }, { data: conversationRows }, { data: auditRows }, { count: products }] = await Promise.all([
     supabase.from('tenant_usage_month').select('*').eq('tenant_id', id).maybeSingle(),
@@ -163,6 +167,45 @@ export default async function AdminTenantPage({ params, searchParams }: { params
                 </div>
               ))}
             </dl>
+          )}
+        </section>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <section className={card}>
+          <h2 className="mb-1 text-base font-semibold">AI persona</h2>
+          <p className="mb-4 text-sm text-zinc-500">Only you can see and change this. Platform instructions override the shop&apos;s own instructions.</p>
+          <form action={saveAiPersona.bind(null, tenant.id)} className="space-y-4">
+            <div>
+              <label className={label} htmlFor="assistantName">Assistant name</label>
+              <input className={input} id="assistantName" name="assistantName" maxLength={60} defaultValue={persona.assistantName ?? ''} placeholder="e.g. Rupa" />
+              <p className={hint}>Blank: it introduces itself as the shop&apos;s AI assistant.</p>
+            </div>
+            <div>
+              <label className={label} htmlFor="tone">Persona and tone</label>
+              <textarea className={input} id="tone" name="tone" rows={3} maxLength={1000} defaultValue={persona.tone ?? ''} placeholder="Warm older-sister tone, calls customers apu/bhaiya, light emoji" />
+            </div>
+            <div>
+              <label className={label} htmlFor="adminInstructions">Platform instructions</label>
+              <textarea className={input} id="adminInstructions" name="adminInstructions" rows={4} maxLength={3000} defaultValue={persona.adminInstructions ?? ''} placeholder="Never promise same-day delivery. Always hand off orders above 10,000 taka." />
+            </div>
+            <button className={btnGhost}>Save persona</button>
+          </form>
+        </section>
+
+        <section className={card}>
+          <h2 className="mb-1 text-base font-semibold">Shop&apos;s AI instructions</h2>
+          <p className="mb-4 text-sm text-zinc-500">Written by the merchant under AI instructions in their dashboard.</p>
+          {playbook.length === 0 ? (
+            <p className="py-4 text-sm text-zinc-500">None yet.</p>
+          ) : (
+            <ol className="list-decimal space-y-2 pl-5 text-sm">
+              {playbook.map((r, i) => (
+                <li key={i}>
+                  <span className="text-zinc-500">When</span> {r.when} <span className="text-zinc-500">→</span> {r.then}
+                </li>
+              ))}
+            </ol>
           )}
         </section>
       </div>

@@ -71,3 +71,21 @@ describe('csv export', () => {
     expect(file.split('\r\n')).toHaveLength(2);
   });
 });
+
+describe('AI persona and playbook', () => {
+  it('keeps only complete, capped rules and puts them in the prompt with admin instructions last', async () => {
+    const { readPlaybook, readPersona } = await import('../web/src/lib/ai-profile.js');
+    const { systemPrompt } = await import('../web/src/lib/agent.js');
+    const rules = readPlaybook([{ when: ' asks for a discount ', then: 'check customer_history' }, { when: 'no action', then: '' }, 'junk', { when: 'x'.repeat(400), then: 'y' }]);
+    expect(rules).toHaveLength(2);
+    expect(rules[0]).toEqual({ when: 'asks for a discount', then: 'check customer_history' });
+    expect(rules[1].when).toHaveLength(300);
+    expect(readPersona({ assistantName: 'Rupa', evil: 'x' })).toEqual({ assistantName: 'Rupa' });
+
+    const prompt = systemPrompt({ id: 't', name: 'Shop', business_category: null, ai_playbook: rules, ai_persona: { assistantName: 'Rupa', adminInstructions: 'No same-day delivery.' } });
+    expect(prompt).toContain('You are Rupa, the AI sales assistant');
+    expect(prompt).toContain('1. When asks for a discount -> check customer_history');
+    expect(prompt.indexOf('PLATFORM INSTRUCTIONS')).toBeGreaterThan(prompt.indexOf('SHOP INSTRUCTIONS —'));
+    expect(systemPrompt({ id: 't', name: 'Shop', business_category: null })).not.toContain('SHOP INSTRUCTIONS —');
+  });
+});

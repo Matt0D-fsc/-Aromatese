@@ -22,7 +22,7 @@ export function InviteAccess({ tenantId, neverSignedIn }: { tenantId: string; ne
       const res = await createInviteLink(tenantId);
       if (res.error) return setError(res.error);
       setLink(res.link ?? '');
-      setMessage(`One-time link for ${res.email}. It expires, so send it now.`);
+      setMessage(`One-time link for ${res.shopName ?? 'this shop'} (${res.email}). It expires, so send it now, and open it in a private window if you test it yourself.`);
     });
   }
 

@@ -13,11 +13,11 @@ const HISTORY_MESSAGES = 20;
 const STAFF_REPLY_TIMEOUT_MS = 5 * 60_000; // customer left waiting on staff this long -> the AI steps back in
 const STAFF_IDLE_HANDBACK_MS = 30 * 60_000; // staff silent this long -> the next customer message goes to the AI
 
-const TENANT_COLUMNS = 'id, name, business_category, status, ai_enabled, monthly_message_limit, policies';
+const TENANT_COLUMNS = 'id, name, business_category, status, ai_enabled, monthly_message_limit, policies, ai_persona, ai_playbook';
 const CONVERSATION_COLUMNS = 'id, ai_muted, taken_over_at, last_staff_reply_at';
 
 type Db = ReturnType<typeof createAdminClient>;
-type Tenant = { id: string; name: string; business_category: string | null; status: string; ai_enabled: boolean; monthly_message_limit: number; policies: unknown };
+type Tenant = { id: string; name: string; business_category: string | null; status: string; ai_enabled: boolean; monthly_message_limit: number; policies: unknown; ai_persona: unknown; ai_playbook: unknown };
 
 const fail = (status: number, error: string) => Response.json({ error }, { status });
 const ms = (iso: string | null | undefined) => (iso ? Date.parse(iso) : 0);

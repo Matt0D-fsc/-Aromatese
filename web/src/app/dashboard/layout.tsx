@@ -29,6 +29,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const links: NavLink[] = [
     ...tabs,
     { href: '/dashboard/customers', label: t(lang, 'nav.customers'), icon: 'customers' },
+    { href: '/dashboard/ai', label: t(lang, 'nav.ai'), icon: 'chats' },
   ];
 
   return (

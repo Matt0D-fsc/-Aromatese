@@ -178,6 +178,7 @@ export default async function HomePage() {
       <section className={`${card} divide-y divide-line p-0 sm:hidden`}>
         {[
           ['/dashboard/customers', t(lang, 'nav.customers')],
+          ['/dashboard/ai', t(lang, 'nav.ai')],
           ['/dashboard/staff', t(lang, 'nav.team')],
           ['/dashboard/onboarding', t(lang, 'nav.profile')],
           [`/chat/${tenant.slug}`, t(lang, 'nav.openChat')],

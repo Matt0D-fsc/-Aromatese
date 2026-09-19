@@ -130,7 +130,7 @@ export default async function AdminPage() {
         </section>
 
         <section className={card}>
-          <h2 className="mb-4 text-base font-semibold">Invite a merchant</h2>
+          <h2 className="mb-4 text-base font-semibold">Add a merchant</h2>
           <InviteForm />
         </section>
 
