@@ -15,8 +15,12 @@ ALTER TABLE tenants
 ALTER TABLE platform_settings
   ADD COLUMN IF NOT EXISTS taka_per_million_tokens NUMERIC(10, 2) NOT NULL DEFAULT 0 CHECK (taka_per_million_tokens >= 0);
 
--- 2. VARIANTS IN SEARCH RESULTS. Same signature and same ranking as before; the agent now also receives each
+-- 2. VARIANTS IN SEARCH RESULTS. Same arguments and same ranking as before; the agent now also receives each
 -- product's variants, so it can answer "ei size ta ache?" from the catalog instead of handing off.
+-- The drop is required, not tidiness: CREATE OR REPLACE cannot add a column to an existing RETURNS TABLE, and
+-- Postgres refuses with "cannot change return type of existing function". The arguments are unchanged, so the
+-- old signature is what gets dropped, and the grants below put back what the drop takes away.
+DROP FUNCTION IF EXISTS search_products(UUID, TEXT, NUMERIC, INT);
 CREATE OR REPLACE FUNCTION search_products(tid UUID, q TEXT, max_price NUMERIC DEFAULT NULL, lim INT DEFAULT 6)
 RETURNS TABLE (
   id UUID, sku VARCHAR, title_en VARCHAR, title_bn VARCHAR, brand VARCHAR, category VARCHAR,
