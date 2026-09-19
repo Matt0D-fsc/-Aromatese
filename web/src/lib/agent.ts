@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { mediaNote, type ChatProduct, type MessageRow } from '@/lib/chat';
 import { policyPrompt, readPolicies } from '@/lib/policies';
 import { playbookPrompt, readPersona, readPlaybook } from '@/lib/ai-profile';
+import { BD_MOBILE, collectAmount, deliveryFees, newOrderNumber, type DeliveryArea } from '@/lib/orders';
 
 // The AI sales agent for one shop. Gemini hears voice notes and sees photos natively, so media goes straight in;
 // every product fact it states comes from tools that read this shop's rows only.
@@ -34,7 +35,6 @@ type Ctx = { db: ReturnType<typeof createAdminClient>; input: AgentInput; shown:
 const MAX_STEPS = 5;
 const MAX_CARDS = 4;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const BD_MOBILE = /^(?:\+?88)?01[3-9]\d{8}$/;
 
 export const TOOLS: FunctionDeclaration[] = [
   {
@@ -87,6 +87,11 @@ export const TOOLS: FunctionDeclaration[] = [
         customer_name: { type: 'string' },
         phone: { type: 'string', description: 'Bangladeshi mobile number, e.g. 01712345678' },
         address: { type: 'string', description: 'Full delivery address: house/road, area, district' },
+        delivery_area: {
+          type: 'string',
+          enum: ['inside_dhaka', 'outside_dhaka'],
+          description: 'Whether the address is inside or outside Dhaka city. The delivery charge depends on it.',
+        },
         note: { type: 'string', description: 'Optional: size, colour or delivery note' },
       },
       required: ['items', 'customer_name', 'phone', 'address'],
@@ -155,7 +160,7 @@ SELLING: adapt to how the customer behaves
 - Browsing or unsure: ask one short question (budget, occasion, colour, size), then suggest 2-3 options.
 - Price-sensitive (asks price first, says expensive, bargains): lead with the sale price if there is one, or offer a cheaper in-stock alternative. Never invent discounts; only SHOP INSTRUCTIONS can authorise one.
 - Interested in one item: give 1-2 benefits from its description/notes. If stock is 3 or fewer, you may say so. Invite them to order.
-- Ready to buy: collect name, mobile number and full address, repeat the items and total, get a yes, then call place_order. Payment is cash on delivery; the shop confirms the delivery charge by phone.
+- Ready to buy: collect name, mobile number and full address, and whether it is inside or outside Dhaka. Repeat the items, the delivery charge from SHOP POLICIES and the total to pay, get a yes, then call place_order with delivery_area. Payment is cash on delivery. If SHOP POLICIES give no clear delivery charge, say the shop confirms it by phone.
 - Out of stock: say so and show similar in-stock items.
 - After they pick something, you may suggest one matching add-on, once.
 - Never pressure or fake urgency.
@@ -331,7 +336,7 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: Ctx): P
   if (name === 'order_status') {
     const number = String(args.order_number ?? '').toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 40);
     const phone = String(args.phone ?? '').replace(/[\s-]/g, '');
-    let query = db.from('orders').select('order_number, status, total_bdt, created_at, items').eq('tenant_id', tenantId);
+    let query = db.from('orders').select('order_number, status, total_bdt, courier_fee_bdt, created_at, items').eq('tenant_id', tenantId);
     // Both values are reduced to safe characters above before they go into the filter string.
     query =
       number && BD_MOBILE.test(phone)
@@ -348,7 +353,9 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: Ctx): P
       order_number: o.order_number,
       status: STATUS[o.status] ?? o.status,
       placed_at: o.created_at,
-      total_bdt: Number(o.total_bdt),
+      items_total_bdt: Number(o.total_bdt),
+      delivery_charge_bdt: Number(o.courier_fee_bdt ?? 0) || 'not set yet: the shop confirms it',
+      collect_on_delivery_bdt: collectAmount(o),
       items: ((o.items ?? []) as { title: string; quantity: number }[]).map((i) => `${i.quantity} x ${i.title}`),
     }));
     return orders.length
@@ -404,6 +411,14 @@ async function placeOrder(args: Record<string, unknown>, ctx: Ctx): Promise<Reco
   if (!name) return { error: "Ask for the customer's name." };
   if (!BD_MOBILE.test(phone)) return { error: 'Invalid phone. Ask for a valid Bangladeshi mobile number like 01712345678.' };
   if (address.length < 10) return { error: 'Ask for the full delivery address (house/road, area, district).' };
+
+  // The charge comes from the shop's own policies, never from the model. A shop that has not written one clear
+  // amount for the area gets no charge on the order, and the customer is told the shop confirms it.
+  const area = args.delivery_area === 'inside_dhaka' || args.delivery_area === 'outside_dhaka' ? (args.delivery_area as DeliveryArea) : null;
+  const fees = deliveryFees(readPolicies(input.tenant.policies));
+  const knownFees = fees.inside_dhaka !== null || fees.outside_dhaka !== null;
+  if (knownFees && !area) return { error: 'Ask whether the address is inside or outside Dhaka, then pass delivery_area.' };
+  const deliveryFee = area ? fees[area] : null;
 
   // Keyed by product and variant: two sizes of the same dress are two lines, priced and stocked separately.
   const quantities = new Map<string, { productId: string; variant: string | null; qty: number }>();
@@ -464,7 +479,7 @@ async function placeOrder(args: Record<string, unknown>, ctx: Ctx): Promise<Reco
   const idempotencyKey = createHash('sha256')
     .update(JSON.stringify([input.conversationId, phone, [...quantities.keys()].sort()]))
     .digest('hex');
-  const orderNumber = `CN-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+  const orderNumber = newOrderNumber();
 
   const { error } = await db.from('orders').insert({
     tenant_id: input.tenant.id,
@@ -474,20 +489,21 @@ async function placeOrder(args: Record<string, unknown>, ctx: Ctx): Promise<Reco
     order_number: orderNumber,
     status: 'draft',
     total_bdt: total,
+    courier_fee_bdt: deliveryFee ?? 0,
     payment_method: 'cod',
-    shipping_address: { name, phone, address, ...(note && { note }) },
+    shipping_address: { name, phone, address, ...(area && { area }), ...(note && { note }) },
     items,
   });
 
   if (error?.code === '23505') {
     const { data: existing } = await db
       .from('orders')
-      .select('order_number, total_bdt')
+      .select('order_number, total_bdt, courier_fee_bdt')
       .eq('tenant_id', input.tenant.id)
       .eq('idempotency_key', idempotencyKey)
       .single();
     ctx.orderNumber = existing?.order_number ?? null;
-    return { already_placed: true, order_number: existing?.order_number, total_bdt: existing?.total_bdt };
+    return { already_placed: true, order_number: existing?.order_number, collect_on_delivery_bdt: existing ? collectAmount(existing) : null };
   }
   if (error) throw error;
 
@@ -495,9 +511,11 @@ async function placeOrder(args: Record<string, unknown>, ctx: Ctx): Promise<Reco
   ctx.orderNumber = orderNumber;
   return {
     order_number: orderNumber,
-    total_bdt: total,
+    items_total_bdt: total,
     items: items.map(({ title, quantity, unit_price }) => ({ title, quantity, unit_price })),
     payment: 'cash on delivery',
-    delivery_charge: 'confirmed by the shop by phone',
+    ...(deliveryFee !== null
+      ? { delivery_charge_bdt: deliveryFee, collect_on_delivery_bdt: collectAmount({ total_bdt: total, courier_fee_bdt: deliveryFee }) }
+      : { delivery_charge: 'confirmed by the shop by phone' }),
   };
 }

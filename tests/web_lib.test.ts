@@ -103,3 +103,20 @@ describe('monthly usage', () => {
     expect(nextReset(late).toISOString()).toBe('2027-01-01T00:00:00.000Z');
   });
 });
+
+describe('delivery fees from policy text', () => {
+  it('reads one clear amount, and nothing when it is ambiguous', async () => {
+    const { parseFee, collectAmount } = await import('../web/src/lib/orders.js');
+    expect(parseFee('60 taka')).toBe(60);
+    expect(parseFee('৳120')).toBe(120);
+    expect(parseFee('১২০ টাকা')).toBe(120);
+    expect(parseFee('Tk 1,200')).toBe(1200);
+    expect(parseFee('Free')).toBe(0);
+    expect(parseFee('ফ্রি ডেলিভারি')).toBe(0);
+    expect(parseFee('60-80 taka')).toBeNull();
+    expect(parseFee('free over 2000, else 60')).toBeNull();
+    expect(parseFee('depends on weight')).toBeNull();
+    expect(parseFee(undefined)).toBeNull();
+    expect(collectAmount({ total_bdt: '2800.00', courier_fee_bdt: '60.00' })).toBe(2860);
+  });
+});
