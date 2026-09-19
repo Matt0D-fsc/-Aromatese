@@ -54,7 +54,8 @@ Status as of 2026-09-19. The pre-launch build scope lives in SCOPE.md; all three
   - [ ] Download customer voice notes and photos
 - [ ] Merchant notifications for new orders and "Needs you" chats (email / push / WhatsApp)
 - [ ] Order fulfilment
-  - [ ] Delivery charge by area (inside/outside Dhaka)
+  - [x] Delivery charge by area (inside/outside Dhaka): read from the shop's delivery policies, added to AI and staff orders
+  - [x] Staff create orders from a chat (agreed prices) and edit new orders; the customer gets the summary in chat
   - [ ] Courier integration (Pathao, Steadfast, RedX)
   - [ ] Order status updates to the customer
   - [ ] Stock reservation so two customers can't buy the last item

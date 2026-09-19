@@ -204,6 +204,10 @@ export default async function ChatsPage({ searchParams }: { searchParams: Promis
                   />
                   <button className={btn}>{t(lang, 'chats.send')}</button>
                 </form>
+                {/* A price agreed in chat, or a discount a shop instruction allowed: the AI cannot write it, staff can. */}
+                <Link href={`/dashboard/orders/new?c=${active.id}`} className={`${btnGhost} w-full sm:w-auto`}>
+                  Create order for this customer
+                </Link>
 
                 {/* Two steps, no JavaScript: the delete button only exists once the merchant opens the disclosure. */}
                 {active.customers?.id && (

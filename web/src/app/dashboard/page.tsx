@@ -8,6 +8,7 @@ import { dhakaTime, taka } from '@/lib/chat';
 import { BellIcon, ChevronRightIcon, PhoneIcon, SearchIcon } from '@/components/icons';
 import { setOrderStatus } from './orders/actions';
 import { UsageMeter } from '@/components/usage-meter';
+import { collectAmount } from '@/lib/orders';
 import { ShareLink } from '@/components/share-link';
 import QRCode from 'qrcode';
 import { siteUrl } from '@/lib/site';
@@ -20,6 +21,7 @@ type OrderRow = {
   id: string;
   order_number: string;
   total_bdt: number;
+  courier_fee_bdt: number | null;
   created_at: string;
   shipping_address: { name?: string; phone?: string; address?: string };
   items: { title: string; quantity: number }[];
@@ -46,7 +48,7 @@ export default async function HomePage() {
       .limit(3),
     supabase
       .from('orders')
-      .select('id, order_number, total_bdt, created_at, shipping_address, items')
+      .select('id, order_number, total_bdt, courier_fee_bdt, created_at, shipping_address, items')
       .eq('tenant_id', tenant.id)
       .eq('status', 'draft')
       .order('created_at', { ascending: false })
@@ -123,7 +125,7 @@ export default async function HomePage() {
                       {o.shipping_address?.address ?? 'No address'} · {dhakaTime(o.created_at)}
                     </p>
                   </div>
-                  <span className="shrink-0 text-lg font-bold tabular-nums">{taka(o.total_bdt)}</span>
+                  <span className="shrink-0 text-lg font-bold tabular-nums">{taka(collectAmount(o))}</span>
                 </div>
 
                 {canWrite && (

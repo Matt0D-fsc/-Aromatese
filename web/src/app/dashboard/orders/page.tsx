@@ -6,16 +6,18 @@ import { getLang } from '@/lib/i18n-server';
 import { btn, btnDanger, btnGhost, card, errorBox, input, statusBadge } from '@/components/ui';
 import { dhakaTime, searchTerm, taka } from '@/lib/chat';
 import { setOrderStatus } from './actions';
+import { collectAmount } from '@/lib/orders';
 
 type OrderRow = {
   id: string;
   order_number: string;
   status: 'draft' | 'confirmed' | 'cancelled';
   total_bdt: number;
+  courier_fee_bdt: number | null;
   payment_method: string;
   created_at: string;
   shipping_address: { name?: string; phone?: string; address?: string; note?: string };
-  items: { title: string; quantity: number; unit_price: number }[];
+  items: { title: string; quantity: number; unit_price: number; list_price?: number }[];
 };
 
 const STATUS_LABEL = { draft: 'new', confirmed: 'active', cancelled: 'suspended' } as const;
@@ -36,7 +38,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
 
   let query = supabase
     .from('orders')
-    .select('id, order_number, status, total_bdt, payment_method, created_at, shipping_address, items', { count: 'exact' })
+    .select('id, order_number, status, total_bdt, courier_fee_bdt, payment_method, created_at, shipping_address, items', { count: 'exact' })
     .eq('tenant_id', tenant.id);
   if (filter !== 'all') query = query.eq('status', filter);
   if (search) query = query.or(`order_number.ilike.*${search}*,shipping_address->>phone.ilike.*${search}*`);
@@ -141,14 +143,21 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                       <li key={i} className="flex justify-between gap-3">
                         <span>
                           {item.quantity} × {item.title}
+                          {item.list_price != null && item.list_price !== item.unit_price && (
+                            <span className="ml-1.5 text-xs text-zinc-400">(catalog {taka(item.list_price)})</span>
+                          )}
                         </span>
                         <span className="tabular-nums">{taka(item.unit_price * item.quantity)}</span>
                       </li>
                     ))}
                   </ul>
-                  <p className="mt-1 flex justify-between border-t border-zinc-100 pt-1 font-semibold">
-                    <span>Total ({o.payment_method.toUpperCase()}, excl. delivery)</span>
-                    <span className="tabular-nums">{taka(o.total_bdt)}</span>
+                  <p className="mt-1 flex justify-between border-t border-zinc-100 pt-1 text-zinc-600">
+                    <span>Delivery</span>
+                    <span className="tabular-nums">{Number(o.courier_fee_bdt) ? taka(Number(o.courier_fee_bdt)) : 'not set'}</span>
+                  </p>
+                  <p className="flex justify-between font-semibold">
+                    <span>To collect ({o.payment_method.toUpperCase()})</span>
+                    <span className="tabular-nums">{taka(collectAmount(o))}</span>
                   </p>
                 </div>
               </div>
@@ -161,6 +170,9 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                   <form action={setOrderStatus.bind(null, o.id, 'cancelled')}>
                     <button className={btnDanger}>{t(lang, 'orders.cancel')}</button>
                   </form>
+                  <Link href={`/dashboard/orders/${o.id}`} className={btnGhost}>
+                    Edit
+                  </Link>
                 </div>
               )}
               {/* A refused delivery or a customer who changed their mind. Two steps, because it moves stock back. */}
