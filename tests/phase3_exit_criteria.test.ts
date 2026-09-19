@@ -55,6 +55,7 @@ describe('PHASE 3: Multimodal Input (Voice & Image) Exit Criteria Validation', (
     // Seed catalog with Punjabi and Saree items
     await catalogService.upsertProducts(TENANT_ID, [
       {
+        id: 'prod-punjabi-white-l',
         sku: 'PUNJABI-WHITE-L',
         titleEn: 'White Cotton Panjabi Premium',
         titleBn: 'সাদা সুতি পাঞ্জাবি প্রিমিয়াম',
@@ -105,7 +106,7 @@ describe('PHASE 3: Multimodal Input (Voice & Image) Exit Criteria Validation', (
     const result = await noisyOrchestrator.processMessageJob(noisyJob);
     expect(result.escalatedToHuman).toBe(true);
     expect(result.replyText).toContain('spashto shona jacche na');
-  }, 25000); // live Gemini call; the 5s default is shorter than the model's own round trip
+  }, 25000); // replayed in a normal run; the timeout is for GEMINI_RECORD=1, which calls the real API
 
   it('EXIT CRITERION 2: Product Image Matching — Top-K vector search + Gemini vision verification matches product or offers honest fallback', async () => {
     const imageJob = {
@@ -124,5 +125,5 @@ describe('PHASE 3: Multimodal Input (Voice & Image) Exit Criteria Validation', (
     expect(reply.replyText).toBeTruthy();
     // Must quote matched item SKU or price, or present honest fallback
     expect(reply.replyText).toMatch(/2200|PUNJABI|stock/i);
-  }, 25000); // live Gemini call, and a vision one: slower again than the voice note above
+  }, 25000); // replayed in a normal run; the timeout is for GEMINI_RECORD=1, which calls the real API
 });

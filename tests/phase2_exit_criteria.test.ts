@@ -56,6 +56,7 @@ describe('PHASE 2: Omnichannel Text Ingestion (Bangla / English / Banglish) Exit
     // Seed catalog with products in English, Bangla, and Banglish
     await catalogService.upsertProducts(TENANT_ID, [
       {
+        id: 'prod-shirt-blue-m',
         sku: 'SHIRT-BLUE-M',
         titleEn: 'Blue Cotton Shirt Size M',
         titleBn: 'নীল সুতি শার্ট সাইজ এম',
@@ -65,6 +66,7 @@ describe('PHASE 2: Omnichannel Text Ingestion (Bangla / English / Banglish) Exit
         isActive: true,
       },
       {
+        id: 'prod-panjabi-black-l',
         sku: 'PANJABI-BLACK-L',
         titleEn: 'Black Premium Silk Panjabi',
         titleBn: 'কালো প্রিমিয়াম সিল্ক পাঞ্জাবি',
@@ -178,5 +180,5 @@ describe('PHASE 2: Omnichannel Text Ingestion (Bangla / English / Banglish) Exit
     // Verify Audit Log captured grounding proof
     expect(auditStore.logs).toHaveLength(1);
     expect(auditStore.logs[0].eventType).toBe('AI_REPLY_SENT');
-  }, 25000); // 15s timeout for live API call
+  }, 25000); // replayed in a normal run; the timeout is for GEMINI_RECORD=1, which calls the real API
 });
