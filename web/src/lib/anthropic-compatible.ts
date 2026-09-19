@@ -20,7 +20,7 @@ type Declaration = { name?: string; description?: string; parametersJsonSchema?:
 
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
-function toMessages(params: Params): Anthropic.MessageParam[] {
+export function toMessages(params: Params): Anthropic.MessageParam[] {
   const contents = (typeof params.contents === 'string' ? [{ role: 'user', parts: [{ text: params.contents }] }] : params.contents) as Content[];
 
   return contents.flatMap((content): Anthropic.MessageParam[] => {
@@ -44,6 +44,11 @@ function toMessages(params: Params): Anthropic.MessageParam[] {
       const mimeType = p.inlineData?.mimeType ?? '';
       if (IMAGE_TYPES.includes(mimeType)) {
         return [{ type: 'image', source: { type: 'base64', media_type: mimeType as Anthropic.Base64ImageSource['media_type'], data: p.inlineData?.data ?? '' } }];
+      }
+      // An image the Messages API cannot carry must not vanish: a photo-only turn would become an empty message
+      // and the customer's turn would disappear from the conversation entirely (iPhones send image/heic).
+      if (mimeType.startsWith('image/')) {
+        return [{ type: 'text', text: `[The customer sent a photo in ${mimeType} format, which this AI engine cannot read. Politely ask them to resend it as a JPEG or PNG.]` }];
       }
       // The Messages API has no audio input: tell the model, so it asks for text instead of the reply failing.
       if (mimeType.startsWith('audio/')) {
