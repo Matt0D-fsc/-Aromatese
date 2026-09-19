@@ -1,6 +1,7 @@
 import { cache } from 'react';
 import { redirect } from 'next/navigation';
 import { createClient } from './supabase/server';
+import type { ShopPolicies } from './policies';
 
 export type TenantStatus = 'invited' | 'active' | 'suspended';
 
@@ -15,6 +16,8 @@ export type Tenant = {
   address: string | null;
   monthly_message_limit: number;
   onboarding_completed_at: string | null;
+  policies: ShopPolicies | null;
+  logo_url: string | null;
 };
 
 // cache(): layout + page share one lookup per request.

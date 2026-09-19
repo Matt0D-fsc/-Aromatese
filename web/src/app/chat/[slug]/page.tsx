@@ -4,13 +4,14 @@ import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { MESSAGE_COLUMNS, VISITOR_COOKIE, toChatLine, type ChatLine, type MessageRow } from '@/lib/chat';
+import { readPolicies } from '@/lib/policies';
 import { ChatClient } from './chat-client';
 
 type Props = { params: Promise<{ slug: string }> };
 
 // Public page: the service role reads only this shop's name and this visitor's own thread (keyed by an httpOnly cookie).
 const getShop = cache(async (slug: string) => {
-  const { data } = await createAdminClient().from('tenants').select('id, name, status').eq('slug', slug).maybeSingle();
+  const { data } = await createAdminClient().from('tenants').select('id, name, status, logo_url, ai_enabled, policies').eq('slug', slug).maybeSingle();
   return data?.status === 'active' ? data : null;
 });
 
@@ -49,5 +50,15 @@ export default async function ChatPage({ params }: Props) {
     }
   }
 
-  return <ChatClient slug={slug} shopName={shop.name} initial={initial} since={initial.at(-1)?.createdAt ?? null} />;
+  return (
+    <ChatClient
+      slug={slug}
+      shopName={shop.name}
+      logoUrl={shop.logo_url}
+      aiActive={Boolean(shop.ai_enabled)}
+      policies={readPolicies(shop.policies)}
+      initial={initial}
+      since={initial.at(-1)?.createdAt ?? null}
+    />
+  );
 }

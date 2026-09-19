@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { autofillProduct, deleteProduct, saveProduct } from './actions';
 import type { ProductInput } from './product-input';
 import { btn, btnDanger, btnGhost, card, errorBox, hint, input, label, noticeBox } from '@/components/ui';
+import { SparkIcon } from '@/components/icons';
 
 const MAX_PHOTOS = 10;
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
@@ -54,6 +55,9 @@ export function ProductForm({ tenantId, product, isNew }: { tenantId: string; pr
     setUploading(false);
   }
 
+  const setVariant = (index: number, patch: Partial<ProductInput['variants'][number]>) =>
+    setForm((f) => ({ ...f, variants: f.variants.map((v, i) => (i === index ? { ...v, ...patch } : v)) }));
+
   // ponytail: removing a photo only unlinks it; the file is cleaned up when the product is deleted.
   const removePhoto = (url: string) => setForm((f) => ({ ...f, imageUrls: f.imageUrls.filter((u) => u !== url) }));
   const makeCover = (url: string) => setForm((f) => ({ ...f, imageUrls: [url, ...f.imageUrls.filter((u) => u !== url)] }));
@@ -68,20 +72,27 @@ export function ProductForm({ tenantId, product, isNew }: { tenantId: string; pr
     setAutofilling(true);
     setError('');
     setNotice('');
-    const res = await autofillProduct(form.titleEn);
+    const res = await autofillProduct({ titleEn: form.titleEn, imageUrls: form.imageUrls });
     setAutofilling(false);
     if ('error' in res) return setError(res.error);
     const d = res.data;
+    // Anything the merchant already wrote wins. The AI fills the blanks, it does not overwrite a decision.
     setForm((f) => ({
       ...f,
+      titleEn: f.titleEn || d.titleEn,
       titleBn: d.titleBn || f.titleBn,
       titleBanglish: d.titleBanglish || f.titleBanglish,
       brand: f.brand || d.brand,
       category: f.category || d.category,
+      description: f.description || d.description,
       customNotes: f.customNotes || d.customNotes,
       voiceTags: [...new Set([...f.voiceTags, ...d.voiceTags.map((t) => t.toLowerCase())])],
     }));
-    setNotice('AI filled in titles, tags and notes. Check them before saving. Price and stock are always set by you.');
+    setNotice(
+      form.imageUrls.length
+        ? 'Read from your photos. Check every line before saving — price and stock are always yours.'
+        : 'AI filled in titles, tags and notes. Check them before saving. Price and stock are always set by you.',
+    );
   }
 
   function onSubmit(e: React.FormEvent) {
@@ -105,7 +116,7 @@ export function ProductForm({ tenantId, product, isNew }: { tenantId: string; pr
     <form onSubmit={onSubmit} className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <Link href="/dashboard" className="text-sm text-zinc-500 hover:text-zinc-900">← Products</Link>
+          <Link href="/dashboard/products" className="text-sm text-zinc-500 hover:text-foreground">← Products</Link>
           <h1 className="text-2xl font-semibold">{isNew ? 'Add a product' : form.titleEn || 'Edit product'}</h1>
         </div>
         <div className="flex gap-2">
@@ -124,20 +135,20 @@ export function ProductForm({ tenantId, product, isNew }: { tenantId: string; pr
             <p className={`${hint} mb-4`}>The first photo is the cover. The AI sends these to customers and uses them to recognise products from customer photos.</p>
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
               {form.imageUrls.map((url, i) => (
-                <div key={url} className="group relative aspect-square overflow-hidden rounded-lg border border-zinc-200 bg-zinc-100">
+                <div key={url} className="group relative aspect-square overflow-hidden rounded-chip border border-line bg-zinc-100">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={url} alt={`Product photo ${i + 1}`} className="h-full w-full object-cover" />
-                  {i === 0 && <span className="absolute left-1 top-1 rounded bg-zinc-900/80 px-1.5 py-0.5 text-[10px] text-white">Cover</span>}
+                  {i === 0 && <span className="absolute left-1 top-1 rounded-chip bg-foreground/80 px-1.5 py-0.5 text-[10px] text-background">Cover</span>}
                   <div className="absolute inset-x-1 bottom-1 flex justify-between gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
                     {i !== 0 && (
-                      <button type="button" onClick={() => makeCover(url)} className="rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-medium">Cover</button>
+                      <button type="button" onClick={() => makeCover(url)} className="rounded-chip bg-surface/90 px-1.5 py-0.5 text-[10px] font-medium">Cover</button>
                     )}
-                    <button type="button" onClick={() => removePhoto(url)} className="ml-auto rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-medium text-red-700">Remove</button>
+                    <button type="button" onClick={() => removePhoto(url)} className="ml-auto rounded-chip bg-surface/90 px-1.5 py-0.5 text-[10px] font-medium text-danger-strong">Remove</button>
                   </div>
                 </div>
               ))}
               {form.imageUrls.length < MAX_PHOTOS && (
-                <label className="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-zinc-300 text-center text-xs text-zinc-500 hover:border-zinc-500 hover:text-zinc-800">
+                <label className="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-chip border-2 border-dashed border-zinc-300 text-center text-xs text-zinc-500 hover:border-zinc-500 hover:text-zinc-800">
                   <span className="text-2xl leading-none">+</span>
                   {uploading ? 'Uploading…' : 'Add photos'}
                   <input
@@ -162,11 +173,21 @@ export function ProductForm({ tenantId, product, isNew }: { tenantId: string; pr
               <label className={label} htmlFor="titleEn">Title (English)</label>
               <div className="flex gap-2">
                 <input className={input} id="titleEn" {...bind('titleEn')} placeholder="Blue Cotton Midi Dress" required maxLength={255} />
-                <button type="button" className={`${btnGhost} shrink-0`} onClick={runAutofill} disabled={autofilling || !form.titleEn.trim()}>
-                  {autofilling ? 'Thinking…' : '✨ AI fill'}
+                <button
+                  type="button"
+                  className={`${btnGhost} shrink-0`}
+                  onClick={runAutofill}
+                  disabled={autofilling || (!form.titleEn.trim() && !form.imageUrls.length)}
+                >
+                  <SparkIcon size={17} />
+                  {autofilling ? 'Reading…' : form.imageUrls.length && !form.titleEn.trim() ? 'Read my photos' : 'AI fill'}
                 </button>
               </div>
-              <p className={hint}>Type the English title, then let AI fill the Bangla title, Banglish title and search tags.</p>
+              <p className={hint}>
+                {form.imageUrls.length
+                  ? 'The AI reads your photos: title, description, category and the words customers search with.'
+                  : 'Add a photo, or type the English title, and the AI fills the rest.'}
+              </p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
@@ -195,6 +216,65 @@ export function ProductForm({ tenantId, product, isNew }: { tenantId: string; pr
               <label className={label} htmlFor="description">Description</label>
               <textarea className={input} id="description" rows={3} {...bind('description')} placeholder="Size, fabric, fit, what's included…" />
             </div>
+          </section>
+
+          <section className={`${card} space-y-4`}>
+            <div>
+              <h2 className="font-semibold">Sizes and colours</h2>
+              <p className={hint}>
+                Optional. Add one row per size or colour and the AI can answer &ldquo;ei size ta ache?&rdquo; itself. Leave the price blank to use the
+                product price.
+              </p>
+            </div>
+            {form.variants.length > 0 && (
+              <ul className="space-y-2">
+                {form.variants.map((v, i) => (
+                  <li key={i} className="grid grid-cols-[1fr_6rem_5rem_2rem] gap-2">
+                    <input
+                      className={input}
+                      value={v.name}
+                      onChange={(e) => setVariant(i, { name: e.target.value })}
+                      placeholder="M / Red"
+                      aria-label={`Size or colour ${i + 1}`}
+                      maxLength={100}
+                    />
+                    <input
+                      className={input}
+                      value={v.priceBdt}
+                      onChange={(e) => setVariant(i, { priceBdt: e.target.value })}
+                      type="number"
+                      min={0}
+                      placeholder="Price"
+                      aria-label={`Price for ${v.name || `size ${i + 1}`}`}
+                    />
+                    <input
+                      className={input}
+                      value={v.stockQuantity}
+                      onChange={(e) => setVariant(i, { stockQuantity: e.target.value })}
+                      type="number"
+                      min={0}
+                      placeholder="Stock"
+                      aria-label={`Stock for ${v.name || `size ${i + 1}`}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, variants: f.variants.filter((_, x) => x !== i) }))}
+                      className="rounded-control text-zinc-400 hover:bg-zinc-100 hover:text-danger"
+                      aria-label={`Remove ${v.name || `size ${i + 1}`}`}
+                    >
+                      ✕
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <button
+              type="button"
+              className={btnGhost}
+              onClick={() => setForm((f) => ({ ...f, variants: [...f.variants, { name: '', priceBdt: '', stockQuantity: '0' }] }))}
+            >
+              + Add a size or colour
+            </button>
           </section>
         </div>
 

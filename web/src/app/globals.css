@@ -1,11 +1,142 @@
 @import "tailwindcss";
 
+/* Class-based dark mode, the HeroUI v3 way: the class on <html> decides, and the server puts it there from
+   a cookie, so the page never flashes the other theme. The system preference is deliberately not followed:
+   one source of truth, and no second copy of every token to keep in step. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Latin first, Bengali second. A font only renders the glyphs it has, so Bengali characters fall
+     through to Anek Bangla on their own — no unicode-range rule to maintain. */
+  --font-sans: var(--font-instrument), var(--font-anek-bangla), system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-body {
-  background: #fafafa;
-  color: #18181b;
+@theme {
+  /* The neutral scale is redefined in place rather than renamed: every zinc-* utility already in the
+     app becomes warm at once, and nothing has to be swept file by file. Warm greys beside the jade
+     read as a shop; the cool default read as a dashboard.
+     Text steps are a little darker than Tailwind's, so the 80 text-zinc-500 labels clear 4.5:1. */
+  --color-zinc-50: oklch(0.985 0.004 85);
+  --color-zinc-100: oklch(0.962 0.006 85);
+  --color-zinc-200: oklch(0.917 0.008 85);
+  --color-zinc-300: oklch(0.86 0.009 85);
+  --color-zinc-400: oklch(0.63 0.012 80);
+  --color-zinc-500: oklch(0.55 0.013 78);
+  --color-zinc-600: oklch(0.48 0.013 76);
+  --color-zinc-700: oklch(0.4 0.012 76);
+  --color-zinc-800: oklch(0.3 0.01 75);
+  --color-zinc-900: oklch(0.21 0.006 75);
+  --color-zinc-950: oklch(0.17 0.006 75);
+
+  /* Semantic tokens, named the way HeroUI v3 names them: a colour, and the colour of text on it. */
+  --color-background: oklch(0.985 0.004 85);
+  --color-foreground: oklch(0.21 0.006 75);
+  --color-surface: oklch(1 0 0);
+  --color-content2: oklch(0.962 0.006 85);
+  --color-line: oklch(0.917 0.008 85);
+  --color-muted: oklch(0.55 0.013 78);
+
+  --color-accent: oklch(0.52 0.09 168);
+  --color-accent-foreground: oklch(1 0 0);
+  --color-accent-soft: oklch(0.95 0.02 168);
+  --color-accent-strong: oklch(0.43 0.08 168);
+
+  --color-warning: oklch(0.59 0.12 70);
+  --color-warning-foreground: oklch(1 0 0);
+  --color-warning-soft: oklch(0.96 0.03 80);
+  --color-warning-strong: oklch(0.45 0.1 70);
+
+  --color-danger: oklch(0.51 0.14 30);
+  --color-danger-foreground: oklch(1 0 0);
+  --color-danger-soft: oklch(0.955 0.02 30);
+  --color-danger-strong: oklch(0.42 0.12 30);
+
+  --radius-chip: 0.625rem;
+  --radius-control: 0.875rem;
+  --radius-card: 1.25rem;
+
+  /* Two elevations only. Anything needing more emphasis needs a different place on the page. */
+  --shadow-raised: 0 1px 2px oklch(0.21 0.006 75 / 0.05), 0 8px 24px -12px oklch(0.21 0.006 75 / 0.18);
+  --shadow-float: 0 1px 2px oklch(0.21 0.006 75 / 0.05), 0 12px 32px -14px oklch(0.21 0.006 75 / 0.24);
+
+  --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Dark: the same token names, different values, so no component carries a dark: variant for colour. */
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  .dark {
+    /* Native scrollbars, form controls and the address bar follow along. */
+    color-scheme: dark;
+    --color-background: oklch(0.17 0.006 75);
+    --color-foreground: oklch(0.95 0.006 85);
+    --color-surface: oklch(0.22 0.007 75);
+    --color-content2: oklch(0.26 0.008 75);
+    --color-line: oklch(0.31 0.009 75);
+    --color-muted: oklch(0.72 0.012 80);
+
+    --color-accent: oklch(0.75 0.11 168);
+    --color-accent-foreground: oklch(0.17 0.006 75);
+    --color-accent-soft: oklch(0.28 0.04 168);
+    --color-accent-strong: oklch(0.85 0.1 168);
+
+    --color-warning: oklch(0.76 0.13 70);
+    --color-warning-foreground: oklch(0.17 0.006 75);
+    --color-warning-soft: oklch(0.28 0.05 70);
+    --color-warning-strong: oklch(0.86 0.11 70);
+
+    --color-danger: oklch(0.71 0.13 30);
+    --color-danger-foreground: oklch(0.17 0.006 75);
+    --color-danger-soft: oklch(0.28 0.05 30);
+    --color-danger-strong: oklch(0.82 0.11 30);
+
+    /* The neutral ramp inverts too, so zinc-100 stays "a step off the background" either way. */
+    --color-zinc-50: oklch(0.22 0.007 75);
+    --color-zinc-100: oklch(0.26 0.008 75);
+    --color-zinc-200: oklch(0.31 0.009 75);
+    --color-zinc-300: oklch(0.38 0.01 75);
+    --color-zinc-400: oklch(0.62 0.012 80);
+    --color-zinc-500: oklch(0.72 0.012 80);
+    --color-zinc-600: oklch(0.8 0.01 82);
+    --color-zinc-700: oklch(0.86 0.008 84);
+    --color-zinc-800: oklch(0.91 0.007 85);
+    --color-zinc-900: oklch(0.95 0.006 85);
+    --color-zinc-950: oklch(0.98 0.004 85);
+
+    --shadow-raised: 0 1px 2px oklch(0 0 0 / 0.3), 0 8px 24px -12px oklch(0 0 0 / 0.5);
+    --shadow-float: 0 1px 2px oklch(0 0 0 / 0.3), 0 12px 32px -14px oklch(0 0 0 / 0.6);
+  }
+}
+
+@layer base {
+  body {
+    background: var(--color-background);
+    color: var(--color-foreground);
+  }
+
+  /* One visible focus style for everything, instead of outlines removed and not replaced. */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  /* Money and counts never reflow while they change. */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

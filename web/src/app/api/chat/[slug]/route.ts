@@ -1,6 +1,8 @@
 import { cookies } from 'next/headers';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { runAgent, type AgentInput } from '@/lib/agent';
+import { storeMedia } from '@/lib/media';
+import { auditError } from '@/lib/audit';
 import { MESSAGE_COLUMNS, VISITOR_COOKIE, toChatLine, type ChatLine, type MessageRow } from '@/lib/chat';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -11,11 +13,11 @@ const HISTORY_MESSAGES = 20;
 const STAFF_REPLY_TIMEOUT_MS = 5 * 60_000; // customer left waiting on staff this long -> the AI steps back in
 const STAFF_IDLE_HANDBACK_MS = 30 * 60_000; // staff silent this long -> the next customer message goes to the AI
 
-const TENANT_COLUMNS = 'id, name, business_category, status, ai_enabled, monthly_message_limit';
+const TENANT_COLUMNS = 'id, name, business_category, status, ai_enabled, monthly_message_limit, policies';
 const CONVERSATION_COLUMNS = 'id, ai_muted, taken_over_at, last_staff_reply_at';
 
 type Db = ReturnType<typeof createAdminClient>;
-type Tenant = { id: string; name: string; business_category: string | null; status: string; ai_enabled: boolean; monthly_message_limit: number };
+type Tenant = { id: string; name: string; business_category: string | null; status: string; ai_enabled: boolean; monthly_message_limit: number; policies: unknown };
 
 const fail = (status: number, error: string) => Response.json({ error }, { status });
 const ms = (iso: string | null | undefined) => (iso ? Date.parse(iso) : 0);
@@ -75,8 +77,8 @@ async function aiReply(db: Db, input: AgentInput): Promise<ChatLine | null> {
   return toChatLine(reply as MessageRow);
 }
 
-function agentFailed(err: unknown) {
-  console.error('[chat] agent failed', err);
+function agentFailed(err: unknown, tenantId: string) {
+  void auditError('chat.agent', err, { tenantId });
   // 429/503 = every model is out of quota or overloaded right now; say so instead of looking broken.
   const status = (err as { status?: number })?.status;
   return status === 429 || status === 503
@@ -99,6 +101,7 @@ export async function POST(request: Request, ctx: RouteContext<'/api/chat/[slug]
   if (!kind) return fail(415, 'Only photos and voice notes can be sent.');
   if (media && media.size > MAX_MEDIA_BYTES) return fail(413, 'File is too large (max 5 MB).');
   if (!media && !text) return fail(400, 'Type a message.');
+  const mediaBytes = media ? Buffer.from(await media.arrayBuffer()) : null;
 
   const db = createAdminClient();
   const tenant = await activeTenant(db, slug);
@@ -145,37 +148,57 @@ export async function POST(request: Request, ctx: RouteContext<'/api/chat/[slug]
   ]);
   if ((recentCount ?? 0) >= MAX_PER_MINUTE) return fail(429, 'You are sending messages too fast. Please wait a moment.');
 
-  const { error: saveError } = await db.from('messages').insert({
-    tenant_id: tenant.id,
-    conversation_id: conversation.id,
-    sender_type: 'customer',
-    content_type: kind,
-    content_text: text || null,
-  });
+  const { data: saved, error: saveError } = await db
+    .from('messages')
+    .insert({
+      tenant_id: tenant.id,
+      conversation_id: conversation.id,
+      sender_type: 'customer',
+      content_type: kind,
+      content_text: text || null,
+    })
+    .select('id')
+    .single();
   if (saveError) return fail(500, 'Chat is unavailable right now.');
 
+  // Uploading and transcribing runs alongside the AI reply, so keeping the media costs the customer no extra wait.
+  // Every return below awaits it: a staff-handled or AI-off chat needs the voice note in the inbox just as much.
+  const persisting = mediaBytes
+    ? storeMedia(db, { id: saved.id, tenantId: tenant.id, conversationId: conversation.id }, { mimeType, kind: kind as 'audio' | 'image', bytes: mediaBytes })
+    : Promise.resolve();
+
   // AI paused for the shop or monthly allowance used: the merchant still gets the message.
-  if (!tenant.ai_enabled || !(await withinMonthlyLimit(db, tenant))) return Response.json({ reply: null });
+  if (!tenant.ai_enabled || !(await withinMonthlyLimit(db, tenant))) {
+    await persisting;
+    return Response.json({ reply: null });
+  }
 
   if (conversation.ai_muted) {
     const staffLastActive = Math.max(ms(conversation.taken_over_at), ms(conversation.last_staff_reply_at));
-    if (Date.now() - staffLastActive < STAFF_IDLE_HANDBACK_MS) return Response.json({ reply: null, staff: true });
+    if (Date.now() - staffLastActive < STAFF_IDLE_HANDBACK_MS) {
+      await persisting;
+      return Response.json({ reply: null, staff: true });
+    }
     // Staff went quiet: the chat returns to the AI.
     await db.from('conversations').update({ ai_muted: false }).eq('id', conversation.id);
   }
 
   try {
-    const reply = await aiReply(db, {
-      tenant,
-      customerId: customer.id,
-      conversationId: conversation.id,
-      history,
-      userText: text,
-      media: media ? { mimeType, data: Buffer.from(await media.arrayBuffer()).toString('base64'), kind: kind as 'audio' | 'image' } : undefined,
-    });
+    const [reply] = await Promise.all([
+      aiReply(db, {
+        tenant,
+        customerId: customer.id,
+        conversationId: conversation.id,
+        history,
+        userText: text,
+        media: mediaBytes ? { mimeType, data: mediaBytes.toString('base64'), kind: kind as 'audio' | 'image' } : undefined,
+      }),
+      persisting,
+    ]);
     return Response.json({ reply, staff: !reply });
   } catch (err) {
-    return agentFailed(err);
+    await persisting;
+    return agentFailed(err, tenant.id);
   }
 }
 

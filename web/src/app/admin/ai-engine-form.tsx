@@ -27,8 +27,8 @@ export function AiEngineForm(props: Props) {
         {options.map(([value, text]) => (
           <label
             key={value}
-            className={`cursor-pointer rounded-lg px-4 py-2 text-sm font-medium ring-1 has-[:focus-visible]:ring-2 ${
-              provider === value ? 'bg-zinc-900 text-white ring-zinc-900' : 'bg-white text-zinc-700 ring-zinc-300 hover:bg-zinc-50'
+            className={`cursor-pointer rounded-control px-4 py-2 text-sm font-medium ring-1 has-[:focus-visible]:ring-2 ${
+              provider === value ? 'bg-foreground text-background ring-foreground' : 'bg-surface text-zinc-700 ring-zinc-300 hover:bg-zinc-50'
             }`}
           >
             <input type="radio" name="provider" value={value} checked={provider === value} onChange={() => setProvider(value)} className="sr-only" />
@@ -71,7 +71,7 @@ export function AiEngineForm(props: Props) {
             placeholder={props.hasKey ? 'Saved. Leave blank to keep it' : 'Optional'}
           />
           {props.hasKey && (
-            <button type="button" onClick={() => clearAiEngineKey()} className="mt-1 text-xs text-red-700 underline">
+            <button type="button" onClick={() => clearAiEngineKey()} className="mt-1 text-xs text-danger-strong underline">
               Remove saved key
             </button>
           )}

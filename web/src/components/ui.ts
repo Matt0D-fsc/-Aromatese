@@ -1,24 +1,31 @@
 // Shared Tailwind class strings. Plain strings, not components: nothing here needs logic.
+// Colours come from the semantic tokens in globals.css, so light and dark are the same class list, and
+// every control clears 44px — these are used on phones, one-handed.
+
 export const input =
-  'w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 disabled:bg-zinc-100';
-export const label = 'mb-1 block text-sm font-medium text-zinc-700';
-export const hint = 'mt-1 text-xs text-zinc-500';
-export const btn =
-  'inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50';
-export const btnGhost =
-  'inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50';
-export const btnDanger =
-  'inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50';
-export const card = 'rounded-xl border border-zinc-200 bg-white p-6 shadow-sm';
-export const errorBox = 'rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700';
-export const noticeBox = 'rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800';
+  'w-full rounded-control border border-line bg-surface px-3.5 py-2.5 text-sm text-foreground placeholder:text-zinc-400 transition-colors duration-150 focus:border-accent focus:outline-none focus:ring-[3px] focus:ring-accent/15 disabled:bg-content2 disabled:text-zinc-400';
+
+export const label = 'mb-1.5 block text-sm font-medium text-zinc-600';
+export const hint = 'mt-1.5 text-xs text-zinc-500';
+
+const button =
+  'inline-flex min-h-11 items-center justify-center gap-2 rounded-control px-4 text-sm font-semibold transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:cursor-not-allowed disabled:opacity-50';
+
+export const btn = `${button} border border-transparent bg-accent text-accent-foreground hover:bg-accent-strong`;
+export const btnGhost = `${button} border border-line bg-surface text-foreground hover:bg-content2`;
+export const btnDanger = `${button} border border-danger/25 bg-surface text-danger hover:bg-danger-soft`;
+
+export const card = 'rounded-card border border-line bg-surface p-6 shadow-raised';
+
+export const errorBox = 'rounded-control border border-danger/25 bg-danger-soft px-3.5 py-2.5 text-sm text-danger-strong';
+export const noticeBox = 'rounded-control border border-accent/25 bg-accent-soft px-3.5 py-2.5 text-sm text-accent-strong';
 
 export function statusBadge(status: string) {
   const color =
     status === 'active'
-      ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+      ? 'bg-accent-soft text-accent-strong ring-accent/20'
       : status === 'suspended'
-        ? 'bg-red-50 text-red-700 ring-red-200'
-        : 'bg-amber-50 text-amber-700 ring-amber-200';
+        ? 'bg-danger-soft text-danger-strong ring-danger/20'
+        : 'bg-warning-soft text-warning-strong ring-warning/25';
   return `inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${color}`;
 }
