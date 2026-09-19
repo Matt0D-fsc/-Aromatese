@@ -9,14 +9,14 @@ import { t } from '@/lib/i18n';
 import { getLang } from '@/lib/i18n-server';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { getTheme } from '@/lib/theme';
+import { UsageBanner } from '@/components/usage-meter';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [{ supabase, tenant, user }, lang, theme] = await Promise.all([requireMerchant(), getLang(), getTheme()]);
-  const { count: needsYou } = await supabase
-    .from('conversations')
-    .select('id', { count: 'exact', head: true })
-    .eq('tenant_id', tenant.id)
-    .eq('needs_human', true);
+  const [{ count: needsYou }, { data: usage }] = await Promise.all([
+    supabase.from('conversations').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('needs_human', true),
+    supabase.from('tenant_usage_month').select('ai_replies').eq('tenant_id', tenant.id).maybeSingle(),
+  ]);
 
   // Five on a phone, the full set on a laptop: Customers and Team are looked up occasionally, not daily.
   const tabs: NavLink[] = [
@@ -56,6 +56,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <TopNav links={[...links, { href: '/dashboard/staff', label: t(lang, 'nav.team'), icon: 'customers' }]} />
       </header>
 
+      <UsageBanner used={usage?.ai_replies ?? 0} limit={tenant.monthly_message_limit} lang={lang} />
       {tenant.status === 'suspended' && (
         <div className="border-b border-danger/25 bg-danger-soft px-4 py-3 text-center text-sm text-danger-strong">{t(lang, 'suspended')}</div>
       )}

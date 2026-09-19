@@ -45,6 +45,11 @@ const en = {
 
   'customers.title': 'Customers',
   'analytics.title': 'Analytics',
+
+  'usage.title': 'AI replies this month',
+  'usage.resets': 'Resets on {date}. Only your AI’s replies count; customer messages and your team’s replies are free.',
+  'usage.warn': 'You have used {pct}% of this month’s AI replies. When they run out, your AI stops replying until {date}. Ask the ChatNab team to raise your limit.',
+  'usage.out': 'Your AI has stopped replying: this month’s {limit} AI replies are used up. New chats wait for you in Chats until {date}. Ask the ChatNab team to raise your limit.',
 } as const;
 
 export type Key = keyof typeof en;
@@ -88,6 +93,11 @@ const bn: Partial<Record<Key, string>> = {
 
   'customers.title': 'ক্রেতা',
   'analytics.title': 'হিসাব',
+
+  'usage.title': 'এই মাসে এআই-এর উত্তর',
+  'usage.resets': '{date} তারিখে আবার শুরু হবে। শুধু এআই-এর উত্তর গোনা হয়; ক্রেতার মেসেজ ও আপনার টিমের উত্তর ফ্রি।',
+  'usage.warn': 'এই মাসের এআই উত্তরের {pct}% ব্যবহার হয়ে গেছে। শেষ হলে {date} পর্যন্ত এআই উত্তর দেবে না। লিমিট বাড়াতে ChatNab টিমকে জানান।',
+  'usage.out': 'আপনার এআই উত্তর দেওয়া বন্ধ করেছে: এই মাসের {limit}টি এআই উত্তর শেষ। {date} পর্যন্ত নতুন চ্যাট চ্যাট পেজে আপনার জন্য অপেক্ষা করবে। লিমিট বাড়াতে ChatNab টিমকে জানান।',
 };
 
 const DICTIONARIES: Record<Lang, Partial<Record<Key, string>>> = { en, bn };

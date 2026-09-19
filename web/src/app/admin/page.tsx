@@ -9,6 +9,7 @@ import { InviteForm } from './invite-form';
 import { RetentionForm } from './retention-form';
 import { InviteAccess } from './invite-access';
 import { setAiEnabled, setTenantStatus, setTokenRate, updateMessageLimit } from './actions';
+import { usageLevel } from '@/lib/usage';
 
 type TenantRow = {
   id: string;
@@ -31,7 +32,7 @@ type AuditRow = { id: string; event_type: string; tenant_id: string | null; acto
 const AUDIT_FEED_SIZE = 25;
 
 // One row per shop from the tenant_usage_month view (calendar month, UTC).
-type UsageRow = { tenant_id: string; messages: number; conversations: number; orders: number; order_value: number; tokens: number };
+type UsageRow = { tenant_id: string; messages: number; ai_replies: number; conversations: number; orders: number; order_value: number; tokens: number };
 
 export default async function AdminPage() {
   const { supabase } = await requireAdmin();
@@ -76,8 +77,30 @@ export default async function AdminPage() {
   );
   const aiCost = (totals.tokens / 1_000_000) * ai.takaPerMillionTokens;
 
+  // Shops whose AI has stopped, or is about to: the ones to call, or to raise, today.
+  const nearLimit = tenants
+    .filter((t) => t.status === 'active')
+    .map((t) => ({ t, used: usage.get(t.id)?.ai_replies ?? 0 }))
+    .filter(({ t, used }) => usageLevel(used, t.monthly_message_limit) !== 'ok')
+    .sort((a, b) => b.used / Math.max(b.t.monthly_message_limit, 1) - a.used / Math.max(a.t.monthly_message_limit, 1));
+
   return (
     <main className="mx-auto max-w-6xl space-y-8 px-4 py-8">
+        {nearLimit.length > 0 && (
+          <section className="rounded-card border border-warning/30 bg-warning-soft p-4 text-sm text-warning-strong" role="status">
+            <p className="font-semibold">Shops at or near their monthly AI reply limit</p>
+            <ul className="mt-2 space-y-1">
+              {nearLimit.map(({ t, used }) => (
+                <li key={t.id}>
+                  <Link href={`/admin/tenants/${t.id}`} className="font-medium underline">{t.name}</Link>{' '}
+                  {used.toLocaleString()} / {t.monthly_message_limit.toLocaleString()}
+                  {usageLevel(used, t.monthly_message_limit) === 'out' ? ' · AI stopped replying' : ' · over 80%'}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-xs">Raise the limit in the merchants table below.</p>
+          </section>
+        )}
         <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {[
             ['Merchants', tenants.length.toLocaleString()],
@@ -141,11 +164,11 @@ export default async function AdminPage() {
                 <th className="px-6 py-3">Merchant</th>
                 <th className="px-3 py-3">Status</th>
                 <th className="px-3 py-3">Products</th>
-                <th className="px-3 py-3">Messages / limit</th>
+                <th className="px-3 py-3">AI replies / limit</th>
                 <th className="px-3 py-3">Chats</th>
                 <th className="px-3 py-3">Orders</th>
                 <th className="px-3 py-3">AI tokens</th>
-                <th className="px-3 py-3">Monthly limit</th>
+                <th className="px-3 py-3">AI replies / month</th>
                 <th className="px-3 py-3">AI</th>
                 <th className="px-6 py-3 text-right">Access</th>
               </tr>
@@ -159,8 +182,8 @@ export default async function AdminPage() {
               {tenants.map((t) => {
                 const u = usage.get(t.id);
                 const access = accessOf(t.id);
-                const used = u?.messages ?? 0;
-                const overLimit = used >= t.monthly_message_limit;
+                const used = u?.ai_replies ?? 0;
+                const level = usageLevel(used, t.monthly_message_limit);
                 return (
                   <tr key={t.id}>
                     <td className="px-6 py-4">
@@ -186,7 +209,7 @@ export default async function AdminPage() {
                       </div>
                     </td>
                     <td className="px-3 py-4 tabular-nums">{t.products[0]?.count ?? 0}</td>
-                    <td className={`px-3 py-4 tabular-nums ${overLimit ? 'font-semibold text-danger' : ''}`}>
+                    <td className={`px-3 py-4 tabular-nums ${level === 'out' ? 'font-semibold text-danger' : level === 'warn' ? 'font-semibold text-warning' : ''}`}>
                       {used.toLocaleString()}
                       <span className="text-zinc-400"> / {t.monthly_message_limit.toLocaleString()}</span>
                     </td>
@@ -205,7 +228,7 @@ export default async function AdminPage() {
                           min={0}
                           step={1}
                           defaultValue={t.monthly_message_limit}
-                          aria-label={`Monthly message limit for ${t.name}`}
+                          aria-label={`Monthly AI reply limit for ${t.name}`}
                         />
                         <button className={`${btnGhost} px-2 py-1`}>Save</button>
                       </form>

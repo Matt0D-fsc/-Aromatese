@@ -1,14 +1,21 @@
-import { cookies } from 'next/headers';
+import { createHash } from 'node:crypto';
+import { cookies, headers } from 'next/headers';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { runAgent, type AgentInput } from '@/lib/agent';
 import { storeMedia } from '@/lib/media';
-import { auditError } from '@/lib/audit';
+import { audit, auditError } from '@/lib/audit';
+import { monthStart, usageLevel } from '@/lib/usage';
 import { MESSAGE_COLUMNS, VISITOR_COOKIE, toChatLine, type ChatLine, type MessageRow } from '@/lib/chat';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_TEXT = 2000;
 const MAX_MEDIA_BYTES = 5 * 1024 * 1024;
 const MAX_PER_MINUTE = 8;
+const MAX_PER_DAY = 150; // one visitor, one shop
+// Per connection, across every visitor behind it. Generous on purpose: Bangladeshi mobile networks put many
+// customers behind one shared IP (carrier NAT), and a real shop's customers must never be blocked by each other.
+const MAX_PER_IP_MINUTE = 40;
+const MAX_PER_IP_DAY = 400;
 const HISTORY_MESSAGES = 20;
 const STAFF_REPLY_TIMEOUT_MS = 5 * 60_000; // customer left waiting on staff this long -> the AI steps back in
 const STAFF_IDLE_HANDBACK_MS = 30 * 60_000; // staff silent this long -> the next customer message goes to the AI
@@ -28,15 +35,25 @@ async function activeTenant(db: Db, slug: string) {
 }
 
 async function withinMonthlyLimit(db: Db, tenant: Tenant) {
-  const monthStart = new Date();
-  monthStart.setUTCDate(1);
-  monthStart.setUTCHours(0, 0, 0, 0);
+  const since = monthStart().toISOString();
   const { count } = await db
     .from('messages')
     .select('id', { count: 'exact', head: true })
     .eq('tenant_id', tenant.id)
-    .gte('created_at', monthStart.toISOString());
-  return (count ?? 0) < tenant.monthly_message_limit;
+    .eq('sender_type', 'bot') // the limit caps the AI's replies; customers and staff are free
+    .gte('created_at', since);
+  const used = count ?? 0;
+  const level = usageLevel(used, tenant.monthly_message_limit);
+  // Once per shop per month for each level, so the admin activity feed shows it without repeating it on every
+  // message. Never delays the reply.
+  if (level !== 'ok') void alertOnce(db, tenant.id, level === 'out' ? 'usage.limit_reached' : 'usage.limit_warning', since, { used, limit: tenant.monthly_message_limit });
+  return level !== 'out';
+}
+
+// ponytail: check-then-insert can record twice if two messages cross the line at once; a duplicate feed row is harmless.
+async function alertOnce(db: Db, tenantId: string, event: string, since: string, detail: Record<string, unknown>) {
+  const { count } = await db.from('audit_logs').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq('event_type', event).gte('created_at', since);
+  if (!count) await audit(event, { tenantId, detail });
 }
 
 async function recentHistory(db: Db, conversationId: string) {
@@ -86,8 +103,20 @@ function agentFailed(err: unknown, tenantId: string) {
     : fail(502, 'Dukkhito, reply dite parlam na. Abar try korun.');
 }
 
+// Salted so the stored value cannot be reversed into an IP by trying every address.
+// ponytail: x-forwarded-for is trusted, which is right behind Vercel or another proxy that sets it; a server
+// exposed directly to the internet would need the socket address instead.
+async function clientIpHash() {
+  const h = await headers();
+  const ip = (h.get('x-forwarded-for')?.split(',')[0] ?? h.get('x-real-ip') ?? '').trim();
+  return ip ? createHash('sha256').update(`${ip}:${process.env.SUPABASE_SERVICE_ROLE_KEY}`).digest('hex').slice(0, 32) : null;
+}
+
+const since = (ms: number) => new Date(Date.now() - ms).toISOString();
+
 // Customer sends a message. Public endpoint: anyone with the shop's chat link can talk to its agent.
-// AI cost is capped per shop by monthly_message_limit and per visitor by MAX_PER_MINUTE.
+// AI cost is capped per shop by monthly_message_limit, a number of AI replies (set in the admin panel). Within that, per-visitor and
+// per-connection limits stop one person from spending the whole allowance and silencing the shop's AI.
 export async function POST(request: Request, ctx: RouteContext<'/api/chat/[slug]'>) {
   const { slug } = await ctx.params;
   const form = await request.formData().catch(() => null);
@@ -137,16 +166,26 @@ export async function POST(request: Request, ctx: RouteContext<'/api/chat/[slug]
     .single();
   if (conversationError) return fail(500, 'Chat is unavailable right now.');
 
-  const [{ count: recentCount }, history] = await Promise.all([
+  const ipHash = await clientIpHash();
+  const count = (filter: { conversation_id?: string; client_ip_hash?: string }, windowMs: number) =>
     db
       .from('messages')
       .select('id', { count: 'exact', head: true })
-      .eq('conversation_id', conversation.id)
+      .eq('tenant_id', tenant.id)
+      .match(filter)
       .eq('sender_type', 'customer')
-      .gte('created_at', new Date(Date.now() - 60_000).toISOString()),
+      .gte('created_at', since(windowMs))
+      .then(({ count: n }) => n ?? 0);
+  const DAY = 24 * 60 * 60_000;
+  const [visitorMinute, visitorDay, ipMinute, ipDay, history] = await Promise.all([
+    count({ conversation_id: conversation.id }, 60_000),
+    count({ conversation_id: conversation.id }, DAY),
+    ipHash ? count({ client_ip_hash: ipHash }, 60_000) : 0,
+    ipHash ? count({ client_ip_hash: ipHash }, DAY) : 0,
     recentHistory(db, conversation.id),
   ]);
-  if ((recentCount ?? 0) >= MAX_PER_MINUTE) return fail(429, 'You are sending messages too fast. Please wait a moment.');
+  if (visitorMinute >= MAX_PER_MINUTE || ipMinute >= MAX_PER_IP_MINUTE) return fail(429, 'You are sending messages too fast. Please wait a moment.');
+  if (visitorDay >= MAX_PER_DAY || ipDay >= MAX_PER_IP_DAY) return fail(429, 'Too many messages today. Please call the shop, or try again tomorrow.');
 
   const { data: saved, error: saveError } = await db
     .from('messages')
@@ -156,6 +195,7 @@ export async function POST(request: Request, ctx: RouteContext<'/api/chat/[slug]
       sender_type: 'customer',
       content_type: kind,
       content_text: text || null,
+      client_ip_hash: ipHash,
     })
     .select('id')
     .single();
@@ -167,8 +207,20 @@ export async function POST(request: Request, ctx: RouteContext<'/api/chat/[slug]
     ? storeMedia(db, { id: saved.id, tenantId: tenant.id, conversationId: conversation.id }, { mimeType, kind: kind as 'audio' | 'image', bytes: mediaBytes })
     : Promise.resolve();
 
-  // AI paused for the shop or monthly allowance used: the merchant still gets the message.
-  if (!tenant.ai_enabled || !(await withinMonthlyLimit(db, tenant))) {
+  // AI paused for the shop or monthly allowance used: the merchant still gets the message, and the chat is
+  // flagged, because the customer has just been told the team will reply and nobody else is going to.
+  const aiAllowed = tenant.ai_enabled && (await withinMonthlyLimit(db, tenant));
+  if (!aiAllowed) {
+    if (!conversation.ai_muted) {
+      await db
+        .from('conversations')
+        .update({
+          needs_human: true,
+          handoff_reason: tenant.ai_enabled ? 'AI is off: this month’s message limit is used up' : 'AI is paused for this shop',
+          handoff_at: new Date().toISOString(),
+        })
+        .eq('id', conversation.id);
+    }
     await persisting;
     return Response.json({ reply: null });
   }

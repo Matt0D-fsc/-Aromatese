@@ -34,7 +34,7 @@ export function InviteForm() {
           <input className={input} id="email" name="email" type="email" placeholder="owner@shop.com" required />
         </div>
         <div>
-          <label className={label} htmlFor="limit">Messages / month</label>
+          <label className={label} htmlFor="limit">AI replies / month</label>
           <input className={input} id="limit" name="limit" type="number" min={0} step={1} defaultValue={1000} required />
         </div>
         {method === 'create' && (

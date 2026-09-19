@@ -89,3 +89,17 @@ describe('AI persona and playbook', () => {
     expect(systemPrompt({ id: 't', name: 'Shop', business_category: null })).not.toContain('SHOP INSTRUCTIONS —');
   });
 });
+
+describe('monthly usage', () => {
+  it('warns from 80% and stops at the limit, with months in UTC', async () => {
+    const { usageLevel, monthStart, nextReset } = await import('../web/src/lib/usage.js');
+    expect(usageLevel(0, 1000)).toBe('ok');
+    expect(usageLevel(799, 1000)).toBe('ok');
+    expect(usageLevel(800, 1000)).toBe('warn');
+    expect(usageLevel(1000, 1000)).toBe('out');
+    expect(usageLevel(0, 0)).toBe('out'); // a limit of 0 means no AI at all
+    const late = new Date('2026-12-31T23:30:00Z');
+    expect(monthStart(late).toISOString()).toBe('2026-12-01T00:00:00.000Z');
+    expect(nextReset(late).toISOString()).toBe('2027-01-01T00:00:00.000Z');
+  });
+});

@@ -7,6 +7,7 @@ import { btn, btnGhost, card } from '@/components/ui';
 import { dhakaTime, taka } from '@/lib/chat';
 import { BellIcon, ChevronRightIcon, PhoneIcon, SearchIcon } from '@/components/icons';
 import { setOrderStatus } from './orders/actions';
+import { UsageMeter } from '@/components/usage-meter';
 
 // What a merchant opens ChatNab to do: answer whoever is waiting, and confirm what sold. Until now the first
 // screen was the product list — the one thing they filled in once and rarely need again.
@@ -32,7 +33,7 @@ export default async function HomePage() {
   if (!tenant.onboarding_completed_at) redirect('/dashboard/onboarding');
 
   const day = today();
-  const [{ data: needsRows }, { data: orderRows }, { data: dailyRow }, { data: unmatchedRows }] = await Promise.all([
+  const [{ data: needsRows }, { data: orderRows }, { data: dailyRow }, { data: unmatchedRows }, { data: usage }] = await Promise.all([
     supabase
       .from('conversations')
       .select('id, handoff_reason, last_message_at, customers(name, phone)')
@@ -49,6 +50,7 @@ export default async function HomePage() {
       .limit(NEW_ORDERS),
     supabase.from('tenant_daily_stats').select('chats, orders, revenue').eq('tenant_id', tenant.id).eq('day', day).maybeSingle(),
     supabase.from('tenant_unmatched_searches_30d').select('query, times').eq('tenant_id', tenant.id).order('times', { ascending: false }).limit(1),
+    supabase.from('tenant_usage_month').select('ai_replies').eq('tenant_id', tenant.id).maybeSingle(),
   ]);
 
   const needs = (needsRows ?? []) as unknown as NeedsRow[];
@@ -159,6 +161,8 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      <UsageMeter used={usage?.ai_replies ?? 0} limit={tenant.monthly_message_limit} lang={lang} />
 
       {missed && (
         <Link href="/dashboard/analytics" className={`${card} flex items-center gap-3 p-4 transition-colors duration-150 hover:bg-content2`}>

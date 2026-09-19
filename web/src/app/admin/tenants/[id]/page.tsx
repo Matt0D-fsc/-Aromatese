@@ -82,7 +82,7 @@ export default async function AdminTenantPage({ params, searchParams }: { params
       <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[
           ['Products', (products ?? 0).toLocaleString()],
-          ['Messages this month', `${(usage?.messages ?? 0).toLocaleString()} / ${tenant.monthly_message_limit.toLocaleString()}`],
+          ['AI replies this month', `${(usage?.ai_replies ?? 0).toLocaleString()} / ${tenant.monthly_message_limit.toLocaleString()}`],
           ['Orders this month', `${(usage?.orders ?? 0).toLocaleString()} · ${taka(Number(usage?.order_value ?? 0))}`],
           ['AI tokens this month', (usage?.tokens ?? 0).toLocaleString()],
         ].map(([name, value]) => (
