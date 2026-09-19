@@ -31,6 +31,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     ...tabs,
     { href: '/dashboard/customers', label: t(lang, 'nav.customers'), icon: 'customers' },
     { href: '/dashboard/ai', label: t(lang, 'nav.ai'), icon: 'chats' },
+    { href: '/dashboard/channels', label: t(lang, 'nav.channels'), icon: 'chats' },
   ];
 
   return (

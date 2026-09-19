@@ -443,6 +443,13 @@ export function ChatClient({ slug, shopName, logoUrl, aiActive, policies, phone,
             )}
           </form>
         )}
+        {/* Small, out of the way, and always there: the customer's chats and voice notes are kept, so the
+            page saying what happens to them has to be reachable from where they are typing. */}
+        <p className="pb-1 pt-2 text-center text-[11px] text-zinc-400">
+          <a href="/privacy" target="_blank" rel="noopener" className="underline">
+            Privacy
+          </a>
+        </p>
       </div>
       {gallery && <Gallery title={gallery.title} photos={gallery.photos} onClose={() => setGallery(null)} />}
     </div>

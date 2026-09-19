@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { requireMerchant } from '@/lib/auth';
 import { audit, throwAudited } from '@/lib/audit';
 import { CHAT_MEDIA_BUCKET } from '@/lib/chat';
+import { deliverToConversation, DeliveryError } from '@/lib/channels';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 async function staffSession() {
@@ -33,11 +34,30 @@ export async function dismissAlert(conversationId: string) {
   await updateConversation(conversationId, { needs_human: false }, 'chat.alert_dismissed');
 }
 
-export async function sendStaffReply(conversationId: string, formData: FormData) {
+export type StaffReplyState = { error?: string; sent?: number };
+
+// Returns its failures rather than throwing them: a reply Meta refused is an ordinary thing for staff to read
+// and act on — usually "the customer has to message you again" — not a crash that loses what they typed.
+export async function sendStaffReply(conversationId: string, _prev: StaffReplyState, formData: FormData): Promise<StaffReplyState> {
   const text = String(formData.get('text') ?? '').trim().slice(0, 2000);
-  if (!text) return;
+  if (!text) return {};
 
   const { supabase, tenant, user } = await staffSession();
+
+  // Handed to Meta before it is recorded, and only for Messenger and Instagram. A saved row is a reply the
+  // customer received: writing it first would show staff a message in the inbox that never left the building.
+  // On the web the row is the delivery, so deliverToConversation does nothing there.
+  try {
+    await deliverToConversation(tenant.id, conversationId, text);
+  } catch (err) {
+    await audit('error.chat.staff_reply_delivery', {
+      actorId: user.id,
+      tenantId: tenant.id,
+      detail: { conversationId, message: String((err as Error)?.message ?? err).slice(0, 300) },
+    });
+    return { error: err instanceof DeliveryError ? err.message : 'Could not send this reply. Please try again.' };
+  }
+
   // The (conversation_id, tenant_id) foreign key rejects another shop's conversation.
   const { error } = await supabase.from('messages').insert({
     tenant_id: tenant.id,
@@ -52,6 +72,7 @@ export async function sendStaffReply(conversationId: string, formData: FormData)
   // Replying is taking over: the AI stays quiet until staff hands back or goes idle for 30 minutes.
   const now = new Date().toISOString();
   await updateConversation(conversationId, { ai_muted: true, needs_human: false, last_staff_reply_at: now, last_message_at: now }, 'chat.staff_reply');
+  return { sent: Date.now() };
 }
 
 // A customer's right to be forgotten, and the merchant's way to honour it. delete_customer_data clears the

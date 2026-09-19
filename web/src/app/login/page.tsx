@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { sendPasswordReset, signIn } from './actions';
@@ -48,10 +49,14 @@ function LoginForms() {
 
 export default function LoginPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center px-4">
+    <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-4">
       <Suspense>
         <LoginForms />
       </Suspense>
+      {/* Public and always reachable: Meta's app review looks for it, and customers are owed it. */}
+      <Link href="/privacy" className="text-xs text-zinc-500 underline">
+        Privacy policy
+      </Link>
     </main>
   );
 }

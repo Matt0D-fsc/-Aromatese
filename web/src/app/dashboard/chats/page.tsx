@@ -4,9 +4,10 @@ import { requireMerchant } from '@/lib/auth';
 import { MicIcon, PhotoIcon } from '@/components/icons';
 import { t } from '@/lib/i18n';
 import { getLang } from '@/lib/i18n-server';
-import { btn, btnDanger, btnGhost, card, input } from '@/components/ui';
+import { btn, btnDanger, btnGhost, card } from '@/components/ui';
 import { CHAT_MEDIA_BUCKET, MESSAGE_COLUMNS, dhakaTime, mediaLabel, taka, toChatLine, type MessageRow } from '@/lib/chat';
-import { dismissAlert, forgetCustomer, handBack, sendStaffReply, takeOver } from './actions';
+import { dismissAlert, forgetCustomer, handBack, takeOver } from './actions';
+import { StaffReplyForm } from './staff-reply-form';
 
 type ConversationRow = {
   id: string;
@@ -192,18 +193,11 @@ export default async function ChatsPage({ searchParams }: { searchParams: Promis
 
             {canWrite && (
               <div className="space-y-2 border-t border-zinc-100 pt-3">
-                <form action={sendStaffReply.bind(null, active.id)} className="flex gap-2">
-                  <input
-                    name="text"
-                    className={input}
-                    placeholder={active.ai_muted ? 'Reply to the customer…' : 'Reply to the customer (this pauses the AI)…'}
-                    required
-                    maxLength={2000}
-                    autoComplete="off"
-                    aria-label="Reply to the customer"
-                  />
-                  <button className={btn}>{t(lang, 'chats.send')}</button>
-                </form>
+                <StaffReplyForm
+                  conversationId={active.id}
+                  placeholder={active.ai_muted ? 'Reply to the customer…' : 'Reply to the customer (this pauses the AI)…'}
+                  sendLabel={t(lang, 'chats.send')}
+                />
                 {/* A price agreed in chat, or a discount a shop instruction allowed: the AI cannot write it, staff can. */}
                 <Link href={`/dashboard/orders/new?c=${active.id}`} className={`${btnGhost} w-full sm:w-auto`}>
                   Create order for this customer
