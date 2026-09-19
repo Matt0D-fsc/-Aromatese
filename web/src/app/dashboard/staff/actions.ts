@@ -8,6 +8,11 @@ import { siteUrl } from '@/lib/site';
 
 export type StaffState = { error?: string; message?: string };
 
+// The only roles that exist. tenant_members.role carries CHECK (role IN ('owner', 'staff')) from migration
+// 003, so anything else — 'admin', say — cannot be stored and would be an unreachable branch here. Widening
+// this list means adding the role to that constraint in a migration first.
+const TEAM_MANAGER_ROLES = ['owner'] as const;
+
 // requireMerchant only proves membership. Team management hands out access to the whole shop through the
 // service role, so it has to prove ownership as well — otherwise any staff member could add accounts.
 async function requireOwner() {
@@ -18,14 +23,14 @@ async function requireOwner() {
     .eq('tenant_id', session.tenant.id)
     .eq('user_id', session.user.id)
     .maybeSingle();
-  return { ...session, isOwner: data?.role === 'owner' || data?.role === 'admin' };
+  return { ...session, isOwner: TEAM_MANAGER_ROLES.includes(data?.role as (typeof TEAM_MANAGER_ROLES)[number]) };
 }
 
 // Staff get their own login rather than sharing the owner's, so the audit trail names a person and losing a
 // phone does not mean changing one password everybody knows.
 export async function inviteStaff(_prev: StaffState, formData: FormData): Promise<StaffState> {
   const { tenant, user, isOwner } = await requireOwner();
-  if (!isOwner) return { error: 'Only a shop owner or admin can add people to the team.' };
+  if (!isOwner) return { error: 'Only the shop owner can add people to the team.' };
   if (tenant.status === 'suspended') return { error: 'Your shop is suspended. Contact the ChatNab team.' };
 
   const email = String(formData.get('email') ?? '').trim().toLowerCase();
@@ -55,7 +60,7 @@ export async function inviteStaff(_prev: StaffState, formData: FormData): Promis
 // shop must never end up with nobody who can sign in.
 export async function removeStaff(userId: string): Promise<void> {
   const { supabase, tenant, user, isOwner } = await requireOwner();
-  if (!isOwner) throw new Error('Only a shop owner or admin can remove people from the team.');
+  if (!isOwner) throw new Error('Only the shop owner can remove people from the team.');
   if (tenant.status === 'suspended') throw new Error('Your shop is suspended.');
   if (userId === user.id) throw new Error('You cannot remove yourself.');
 
