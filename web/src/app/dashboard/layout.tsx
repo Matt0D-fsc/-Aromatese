@@ -6,9 +6,11 @@ import { LiveRefresh } from '@/components/live-refresh';
 import { LanguageToggle } from '@/components/language-toggle';
 import { BottomTabs, TopNav, type NavLink } from '@/components/dashboard-nav';
 import { getLang, t } from '@/lib/i18n';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { getTheme } from '@/lib/theme';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const [{ supabase, tenant, user }, lang] = await Promise.all([requireMerchant(), getLang()]);
+  const [{ supabase, tenant, user }, lang, theme] = await Promise.all([requireMerchant(), getLang(), getTheme()]);
   const { count: needsYou } = await supabase
     .from('conversations')
     .select('id', { count: 'exact', head: true })
@@ -39,11 +41,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
             )}
             <span className="truncate text-lg font-semibold">{tenant.name}</span>
           </Link>
-          <form action={signOut} className="flex shrink-0 items-center gap-2 text-sm text-zinc-500">
-            <LanguageToggle lang={lang} />
-            <span className="hidden md:inline">{user.email}</span>
-            <button className={btnGhost}>{t(lang, 'nav.signOut')}</button>
-          </form>
+          <div className="flex shrink-0 items-center gap-1 text-sm text-zinc-500">
+            <ThemeToggle theme={theme} />
+            <form action={signOut} className="flex items-center gap-2">
+              <LanguageToggle lang={lang} />
+              <span className="hidden md:inline">{user.email}</span>
+              <button className={btnGhost}>{t(lang, 'nav.signOut')}</button>
+            </form>
+          </div>
         </div>
 
         <TopNav links={[...links, { href: '/dashboard/staff', label: t(lang, 'nav.team'), icon: 'customers' }]} />

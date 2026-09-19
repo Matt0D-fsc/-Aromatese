@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Instrument_Sans, Anek_Bangla } from 'next/font/google';
+import { getTheme } from '@/lib/theme';
 import './globals.css';
 
 // Two faces, one voice. Until now the app loaded a Latin-only font, so every Bengali character fell back
@@ -23,9 +24,12 @@ export const metadata: Metadata = {
   description: 'AI sales agent for WhatsApp, Messenger and Instagram shops',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Read on the server, so the class is in the first byte of HTML and the page never flashes the other theme.
+  const theme = await getTheme();
+
   return (
-    <html lang="en" className={`${instrument.variable} ${anekBangla.variable} h-full antialiased`}>
+    <html lang="en" className={`${theme} ${instrument.variable} ${anekBangla.variable} h-full antialiased`}>
       <body className="min-h-full bg-background font-sans text-foreground">{children}</body>
     </html>
   );
