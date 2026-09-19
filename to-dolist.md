@@ -25,12 +25,13 @@ Status as of 2026-09-19. The pre-launch build scope lives in SCOPE.md; all three
 - [ ] Deploy: hosting (e.g. Vercel) + domain + HTTPS (also enables the microphone on phones)
 - [ ] Email delivery (SMTP) for merchant invites and password resets
 - [x] Shop policies for the AI: delivery charges, delivery time, returns, payment, hours (shop profile)
-- [ ] Abuse protection on the public chat: per-IP rate limits and basic bot protection (current limit is per browser cookie)
+- [x] Abuse protection on the public chat: per visitor (8/min, 150/day) and per connection (40/min, 400/day, generous for carrier NAT), on top of the admin-set monthly limit per shop. Bot challenge (e.g. Turnstile) only if abuse shows up
+- [x] Phone photos shrunk in the browser before upload (chat and product photos), so 5 MB+ camera photos no longer fail
 - [x] Error monitoring (failures land in the audit trail and the admin panel; see DECISIONS.md)
 - [ ] Move the in-house AI API key into Supabase Vault
 - [x] Delete a customer's data (chat inbox) and purge old chats (admin panel)
 - [ ] Privacy policy page
-- [ ] Resolve the gateway upstream question (official Gemini/Anthropic APIs vs IDE access) before real customer data flows through it
+- [x] Gateway decided: Mavs Gateway is the primary AI engine, Gemini provider only as fallback
 
 ## 3. What makes ChatNab sell in Bangladesh
 - [ ] Facebook Messenger integration (first), then Instagram and WhatsApp
@@ -50,7 +51,7 @@ Status as of 2026-09-19. The pre-launch build scope lives in SCOPE.md; all three
 
 ## 4. Growth features (later)
 - [ ] Payments: bKash and Nagad
-- [ ] Bulk product import (CSV in; CSV export is done)
+- [ ] Bulk product import (CSV in; CSV export is done) — needed before launch, design in progress
 - [ ] Assigning chats to a particular staff member (staff accounts themselves are done)
 - [x] Merchant analytics: conversion, top products, unmatched searches, AI vs staff
 - [ ] Smarter search: by meaning and photo similarity for large catalogs
