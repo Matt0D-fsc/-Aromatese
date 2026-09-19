@@ -185,3 +185,15 @@ export function MoonIcon({ size = 20, className }: IconProps) {
     </svg>
   );
 }
+
+export function SparkIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className}>
+      <path d="M12 3v3" />
+      <path d="M12 18v3" />
+      <path d="M5 12H2" />
+      <path d="M22 12h-3" />
+      <circle cx="12" cy="12" r="4" />
+    </svg>
+  );
+}

@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { autofillProduct, deleteProduct, saveProduct } from './actions';
 import type { ProductInput } from './product-input';
 import { btn, btnDanger, btnGhost, card, errorBox, hint, input, label, noticeBox } from '@/components/ui';
+import { SparkIcon } from '@/components/icons';
 
 const MAX_PHOTOS = 10;
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
@@ -71,20 +72,27 @@ export function ProductForm({ tenantId, product, isNew }: { tenantId: string; pr
     setAutofilling(true);
     setError('');
     setNotice('');
-    const res = await autofillProduct(form.titleEn);
+    const res = await autofillProduct({ titleEn: form.titleEn, imageUrls: form.imageUrls });
     setAutofilling(false);
     if ('error' in res) return setError(res.error);
     const d = res.data;
+    // Anything the merchant already wrote wins. The AI fills the blanks, it does not overwrite a decision.
     setForm((f) => ({
       ...f,
+      titleEn: f.titleEn || d.titleEn,
       titleBn: d.titleBn || f.titleBn,
       titleBanglish: d.titleBanglish || f.titleBanglish,
       brand: f.brand || d.brand,
       category: f.category || d.category,
+      description: f.description || d.description,
       customNotes: f.customNotes || d.customNotes,
       voiceTags: [...new Set([...f.voiceTags, ...d.voiceTags.map((t) => t.toLowerCase())])],
     }));
-    setNotice('AI filled in titles, tags and notes. Check them before saving. Price and stock are always set by you.');
+    setNotice(
+      form.imageUrls.length
+        ? 'Read from your photos. Check every line before saving — price and stock are always yours.'
+        : 'AI filled in titles, tags and notes. Check them before saving. Price and stock are always set by you.',
+    );
   }
 
   function onSubmit(e: React.FormEvent) {
@@ -108,7 +116,7 @@ export function ProductForm({ tenantId, product, isNew }: { tenantId: string; pr
     <form onSubmit={onSubmit} className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <Link href="/dashboard" className="text-sm text-zinc-500 hover:text-zinc-900">← Products</Link>
+          <Link href="/dashboard/products" className="text-sm text-zinc-500 hover:text-foreground">← Products</Link>
           <h1 className="text-2xl font-semibold">{isNew ? 'Add a product' : form.titleEn || 'Edit product'}</h1>
         </div>
         <div className="flex gap-2">
@@ -165,11 +173,21 @@ export function ProductForm({ tenantId, product, isNew }: { tenantId: string; pr
               <label className={label} htmlFor="titleEn">Title (English)</label>
               <div className="flex gap-2">
                 <input className={input} id="titleEn" {...bind('titleEn')} placeholder="Blue Cotton Midi Dress" required maxLength={255} />
-                <button type="button" className={`${btnGhost} shrink-0`} onClick={runAutofill} disabled={autofilling || !form.titleEn.trim()}>
-                  {autofilling ? 'Thinking…' : '✨ AI fill'}
+                <button
+                  type="button"
+                  className={`${btnGhost} shrink-0`}
+                  onClick={runAutofill}
+                  disabled={autofilling || (!form.titleEn.trim() && !form.imageUrls.length)}
+                >
+                  <SparkIcon size={17} />
+                  {autofilling ? 'Reading…' : form.imageUrls.length && !form.titleEn.trim() ? 'Read my photos' : 'AI fill'}
                 </button>
               </div>
-              <p className={hint}>Type the English title, then let AI fill the Bangla title, Banglish title and search tags.</p>
+              <p className={hint}>
+                {form.imageUrls.length
+                  ? 'The AI reads your photos: title, description, category and the words customers search with.'
+                  : 'Add a photo, or type the English title, and the AI fills the rest.'}
+              </p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>

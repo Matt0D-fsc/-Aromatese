@@ -112,35 +112,68 @@ export async function deleteProduct(id: string): Promise<{ error: string } | und
 }
 
 export type AutofillResult = {
+  titleEn: string;
   titleBn: string;
   titleBanglish: string;
   brand: string;
   category: string;
+  description: string;
   voiceTags: string[];
   customNotes: string;
 };
 
 const AUTOFILL_PROMPT = `You are a product catalog assistant for shops in Bangladesh.
-Given an English product title, return JSON only:
+You are given a product's photos, its English title, or both. Read whatever you are given and return JSON only:
 {
+  "titleEn": "short English title, 3-6 words; if a title was given, repeat it unchanged",
   "titleBn": "natural Bengali-script title",
   "titleBanglish": "how Bangladeshi customers would type it in Roman letters",
-  "brand": "brand if named or obvious, else empty string",
+  "brand": "brand if named in the title or legible in a photo, else empty string",
   "category": "short product category",
+  "description": "one or two sentences describing only what is visible: type, colour, pattern, material, neckline, sleeve, closure",
   "voiceTags": ["8-15 lowercase words customers might say or type: Bangla, Banglish and English synonyms, colors, materials"],
-  "customNotes": "one or two honest selling points implied by the title; never invent specs, prices, discounts or stock"
+  "customNotes": "one or two honest selling points that follow from what you can see; never invent specs, prices, discounts or stock"
 }
+Describe only what is actually in the photo. Never guess a size, a fabric weight, a measurement or a brand that is not legible.
 Only use apparel words (kapor, suti) for clothing. For watches include words like ghori, watch, হাত ঘড়ি.`;
 
-export async function autofillProduct(titleEn: string): Promise<{ error: string } | { data: AutofillResult }> {
-  await requireMerchant();
-  const title = String(titleEn ?? '').trim().slice(0, 200);
-  if (!title) return { error: 'Type the English title first.' };
+const MAX_AUTOFILL_PHOTOS = 2;
+const MAX_AUTOFILL_BYTES = 5 * 1024 * 1024;
+
+// Reading the photos is the point: a merchant who has uploaded pictures should not also have to type what is
+// in them. Until now this only ever saw the title, so the pictures contributed nothing to how findable a
+// product was.
+export async function autofillProduct(input: { titleEn?: string; imageUrls?: string[] }): Promise<{ error: string } | { data: AutofillResult }> {
+  const { tenant } = await requireMerchant();
+  const title = String(input?.titleEn ?? '').trim().slice(0, 200);
+
+  // Only this shop's own uploads are fetched. Without the prefix check, the URL list would be an open
+  // instruction to the server to fetch anything.
+  const ownPrefix = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${tenant.id}/`;
+  const photoUrls = (Array.isArray(input?.imageUrls) ? input.imageUrls : [])
+    .filter((u): u is string => typeof u === 'string' && u.startsWith(ownPrefix))
+    .slice(0, MAX_AUTOFILL_PHOTOS);
+
+  if (!title && !photoUrls.length) return { error: 'Add a photo, or type the English title first.' };
 
   try {
+    const photos = [];
+    for (const url of photoUrls) {
+      const file = await fetch(url).catch(() => null);
+      if (!file?.ok) continue;
+      const bytes = Buffer.from(await file.arrayBuffer());
+      if (!bytes.length || bytes.length > MAX_AUTOFILL_BYTES) continue;
+      photos.push({ inlineData: { mimeType: file.headers.get('content-type') ?? 'image/jpeg', data: bytes.toString('base64') } });
+    }
+
     const res = await generateContent({
       model: GEMINI_MODEL,
-      contents: `Product title: ${JSON.stringify(title)}`,
+      contents: [
+        {
+          role: 'user',
+          parts: [...photos, { text: title ? `Product title: ${JSON.stringify(title)}` : 'No title yet. Read the photos and write one.' }],
+        },
+      ],
       config: { systemInstruction: AUTOFILL_PROMPT, responseMimeType: 'application/json', temperature: 0.2 },
     });
     // Some models (especially in-house ones) wrap the JSON in prose, code fences or <think> blocks: keep only the object.
@@ -149,10 +182,12 @@ export async function autofillProduct(titleEn: string): Promise<{ error: string 
     const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
     return {
       data: {
+        titleEn: str(d.titleEn) || title,
         titleBn: str(d.titleBn),
         titleBanglish: str(d.titleBanglish),
         brand: str(d.brand),
         category: str(d.category),
+        description: str(d.description),
         voiceTags: Array.isArray(d.voiceTags) ? d.voiceTags.map(str).filter(Boolean).slice(0, 20) : [],
         customNotes: str(d.customNotes),
       },
