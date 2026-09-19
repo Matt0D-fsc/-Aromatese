@@ -8,6 +8,9 @@ import { dhakaTime, taka } from '@/lib/chat';
 import { BellIcon, ChevronRightIcon, PhoneIcon, SearchIcon } from '@/components/icons';
 import { setOrderStatus } from './orders/actions';
 import { UsageMeter } from '@/components/usage-meter';
+import { ShareLink } from '@/components/share-link';
+import QRCode from 'qrcode';
+import { siteUrl } from '@/lib/site';
 
 // What a merchant opens ChatNab to do: answer whoever is waiting, and confirm what sold. Until now the first
 // screen was the product list — the one thing they filled in once and rarely need again.
@@ -58,6 +61,8 @@ export default async function HomePage() {
   const stats = (dailyRow ?? { chats: 0, orders: 0, revenue: 0 }) as DailyRow;
   const missed = ((unmatchedRows ?? []) as UnmatchedRow[])[0];
   const canWrite = tenant.status !== 'suspended';
+  const chatUrl = `${await siteUrl()}/chat/${tenant.slug}`;
+  const qr = await QRCode.toDataURL(chatUrl, { margin: 1, width: 480 });
   const who = (row: NeedsRow) => row.customers?.name || row.customers?.phone || 'A visitor';
 
   return (
@@ -160,6 +165,11 @@ export default async function HomePage() {
             <p className="mt-0.5 text-sm text-zinc-400">order value</p>
           </div>
         </div>
+      </section>
+
+      <section className={card}>
+        <h2 className="mb-3 text-base font-semibold">Your chat link</h2>
+        <ShareLink url={chatUrl} qr={qr} shopName={tenant.name} />
       </section>
 
       <UsageMeter used={usage?.ai_replies ?? 0} limit={tenant.monthly_message_limit} lang={lang} />

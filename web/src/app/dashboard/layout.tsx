@@ -10,6 +10,7 @@ import { getLang } from '@/lib/i18n-server';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { getTheme } from '@/lib/theme';
 import { UsageBanner } from '@/components/usage-meter';
+import { ShopAlerts } from '@/components/shop-alerts';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [{ supabase, tenant, user }, lang, theme] = await Promise.all([requireMerchant(), getLang(), getTheme()]);
@@ -44,6 +45,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <span className="truncate text-lg font-semibold">{tenant.name}</span>
           </Link>
           <div className="flex shrink-0 items-center gap-1 text-sm text-zinc-500">
+            <ShopAlerts tenantId={tenant.id} />
             <ThemeToggle theme={theme} />
             <form action={signOut} className="flex items-center gap-2">
               <LanguageToggle lang={lang} />

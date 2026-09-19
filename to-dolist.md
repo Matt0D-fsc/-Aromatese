@@ -13,6 +13,18 @@ Status as of 2026-09-19. The pre-launch build scope lives in SCOPE.md; all three
 - AI engine switch in the admin panel: Gemini (.env) or in-house AI (OpenAI or Anthropic API format), with a connection and tool-calling test
 - Gemini key rotation and model fallback for testing; Mavs Gateway connected
 
+## Done 2026-09-20 (workflow audit fixes)
+- [x] Platform AI persona moved to an admin-only table (it was readable by shop members)
+- [x] Indexes on the hot paths; security headers (dashboards cannot be framed)
+- [x] Confirming refuses to oversell; confirmed orders can be cancelled and their stock comes back
+- [x] Staff added without email (password or one-time link), same as merchants
+- [x] AI answers "where is my order" (order_status tool; another device needs order number + phone)
+- [x] Chat says it is an AI assistant; Call-the-shop button
+- [x] Product photo gallery in chat; link previews (description, logo); QR code + share card on the dashboard home
+- [x] Sound + browser notifications for new orders and "needs you" chats while the dashboard is open
+- [x] Products: search, filters (low / out / hidden), paging, quick stock edit
+- [x] Monthly limit counts AI replies only; usage meter, warnings, near-limit list in admin
+
 ## 1. Loose ends (this week)
 - [x] Commit recent work (migrations 007–008, AI engine switch, model fallback, Anthropic format, phone fix, AI fill fixes)
 - [ ] Hands-on test: merchant dashboard buttons (Take over, reply, Hand back, confirm/cancel order, product edit/delete)
