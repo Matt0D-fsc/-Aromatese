@@ -6,6 +6,7 @@ import { btnGhost, card, hint, input, label, statusBadge } from '@/components/ui
 import { dhakaTime, mediaLabel, taka, toChatLine, MESSAGE_COLUMNS, type MessageRow } from '@/lib/chat';
 import { POLICY_FIELDS, readPolicies } from '@/lib/policies';
 import { getAiSettings } from '@/lib/ai-settings';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { saveAiPersona, updatePlan } from '../../actions';
 import { readPersona, readPlaybook } from '@/lib/ai-profile';
 import { PLANS } from '@/lib/plans';
@@ -17,7 +18,7 @@ type Tenant = {
   id: string; name: string; slug: string; status: string; contact_email: string | null; contact_phone: string | null;
   business_category: string | null; address: string | null; monthly_message_limit: number; ai_enabled: boolean;
   onboarding_completed_at: string | null; created_at: string; policies: unknown; plan: string; plan_price_bdt: number;
-  ai_persona: unknown; ai_playbook: unknown;
+  ai_playbook: unknown;
 };
 type OrderRow = { id: string; order_number: string; status: string; total_bdt: number; created_at: string; shipping_address: { name?: string; phone?: string } };
 type ConversationRow = { id: string; channel: string; last_message_at: string; needs_human: boolean; ai_muted: boolean; customers: { name: string | null; phone: string | null } | null };
@@ -32,7 +33,9 @@ export default async function AdminTenantPage({ params, searchParams }: { params
   if (!tenantRow) notFound();
   const tenant = tenantRow as Tenant;
   const policies = readPolicies(tenant.policies);
-  const persona = readPersona(tenant.ai_persona);
+  // Service role: the persona table has no grants at all, so the merchant cannot read it through the API.
+  const { data: personaRow } = await createAdminClient().from('tenant_ai_persona').select('persona').eq('tenant_id', id).maybeSingle();
+  const persona = readPersona(personaRow?.persona);
   const playbook = readPlaybook(tenant.ai_playbook);
 
   const [{ data: usage }, { data: orderRows }, { data: conversationRows }, { data: auditRows }, { count: products }] = await Promise.all([
@@ -174,7 +177,7 @@ export default async function AdminTenantPage({ params, searchParams }: { params
       <div className="grid gap-4 lg:grid-cols-2">
         <section className={card}>
           <h2 className="mb-1 text-base font-semibold">AI persona</h2>
-          <p className="mb-4 text-sm text-zinc-500">Only you can see and change this. Platform instructions override the shop&apos;s own instructions.</p>
+          <p className="mb-4 text-sm text-zinc-500">Only platform admins can see and change this. Platform instructions override the shop&apos;s own instructions.</p>
           <form action={saveAiPersona.bind(null, tenant.id)} className="space-y-4">
             <div>
               <label className={label} htmlFor="assistantName">Assistant name</label>

@@ -4,9 +4,9 @@ import { revalidatePath } from 'next/cache';
 import { requireMerchant } from '@/lib/auth';
 import { audit, throwAudited } from '@/lib/audit';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { siteUrl } from '@/lib/site';
+import { createLogin, handover, readLoginForm } from '@/lib/accounts';
 
-export type StaffState = { error?: string; message?: string };
+export type StaffState = { error?: string; message?: string; link?: string };
 
 // The only roles that exist. tenant_members.role carries CHECK (role IN ('owner', 'staff')) from migration
 // 003, so anything else — 'admin', say — cannot be stored and would be an unreachable branch here. Widening
@@ -36,24 +36,22 @@ export async function inviteStaff(_prev: StaffState, formData: FormData): Promis
   const email = String(formData.get('email') ?? '').trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: 'Enter a valid email.' };
 
-  const admin = createAdminClient();
-  const { data: invite, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
-    redirectTo: `${await siteUrl()}/auth/set-password`,
-  });
-  if (inviteError || !invite.user) {
-    // Someone with this email already has a login, e.g. they work for another shop too.
-    return { error: inviteError?.message ?? 'Could not send the invite.' };
-  }
+  // The same three ways in as a new merchant: a password to hand over, a one-time link, or an emailed invite.
+  const { method, password } = readLoginForm(formData);
+  const login = await createLogin(email, method, password);
+  // Most often: someone with this email already has a login, e.g. they work for another shop too.
+  if ('error' in login) return { error: login.error };
 
-  const { error } = await admin.from('tenant_members').insert({ tenant_id: tenant.id, user_id: invite.user.id, role: 'staff' });
+  const admin = createAdminClient();
+  const { error } = await admin.from('tenant_members').insert({ tenant_id: tenant.id, user_id: login.userId, role: 'staff' });
   if (error) {
-    await admin.auth.admin.deleteUser(invite.user.id);
+    await admin.auth.admin.deleteUser(login.userId);
     return { error: error.code === '23505' ? 'They are already on your team.' : error.message };
   }
 
-  await audit('staff.invited', { actorId: user.id, tenantId: tenant.id, detail: { email } });
+  await audit('staff.invited', { actorId: user.id, tenantId: tenant.id, detail: { email, method } });
   revalidatePath('/dashboard/staff');
-  return { message: `Invite sent to ${email}.` };
+  return handover(email, method, password);
 }
 
 // Only staff can be removed, and never yourself: an owner must not be able to lock their own shop away, and a

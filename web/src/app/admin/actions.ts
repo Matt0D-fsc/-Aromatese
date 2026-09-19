@@ -8,9 +8,9 @@ import { clearAiSettingsCache, getAiSettings } from '@/lib/ai-settings';
 import { anthropicGenerateContent } from '@/lib/anthropic-compatible';
 import { customGenerateContent } from '@/lib/openai-compatible';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { siteUrl } from '@/lib/site';
 import { PLANS, type Plan } from '@/lib/plans';
 import { readPersona } from '@/lib/ai-profile';
+import { createLogin, handover, oneTimeLink, readLoginForm } from '@/lib/accounts';
 
 export type InviteState = { error?: string; message?: string; link?: string };
 
@@ -23,8 +23,7 @@ export async function inviteMerchant(_prev: InviteState, formData: FormData): Pr
   const shopName = String(formData.get('shopName') ?? '').trim();
   const email = String(formData.get('email') ?? '').trim().toLowerCase();
   const limit = Number(formData.get('limit') ?? 1000);
-  const method = formData.get('method') === 'email' ? 'email' : 'create';
-  const password = String(formData.get('password') ?? '');
+  const { method, password } = readLoginForm(formData);
   if (method === 'create' && password && password.length < 8) return { error: 'The starting password needs at least 8 characters.' };
   if (!shopName || shopName.length > 255) return { error: 'Shop name is required (max 255 characters).' };
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: 'Enter a valid email.' };
@@ -41,39 +40,24 @@ export async function inviteMerchant(_prev: InviteState, formData: FormData): Pr
     .single();
   if (tenantError) return { error: tenantError.message };
 
-  const { data: invite, error: inviteError } =
-    method === 'email'
-      ? await admin.auth.admin.inviteUserByEmail(email, { redirectTo: `${await siteUrl()}/auth/set-password` })
-      : // email_confirm: the address is a login name here, not proof of an inbox; nobody is sent anything.
-        await admin.auth.admin.createUser({ email, email_confirm: true, ...(password && { password }) });
-  if (inviteError || !invite.user) {
+  const login = await createLogin(email, method, password);
+  if ('error' in login) {
     await admin.from('tenants').delete().eq('id', tenant.id);
-    return { error: inviteError?.message ?? 'Invite failed.' };
+    return { error: login.error };
   }
 
   const { error: memberError } = await admin
     .from('tenant_members')
-    .insert({ tenant_id: tenant.id, user_id: invite.user.id, role: 'owner' });
+    .insert({ tenant_id: tenant.id, user_id: login.userId, role: 'owner' });
   if (memberError) {
-    await admin.auth.admin.deleteUser(invite.user.id);
+    await admin.auth.admin.deleteUser(login.userId);
     await admin.from('tenants').delete().eq('id', tenant.id);
     return { error: memberError.message };
   }
 
   await audit('merchant.invited', { actorId: admin_user.id, tenantId: tenant.id, detail: { email, shopName, limit, method } });
   revalidatePath('/admin');
-  if (method === 'email') return { message: `Invite sent to ${email}.` };
-  if (password) return { message: `${shopName} is ready. They sign in at /login as ${email} with the password you set, and can change it under Shop profile.` };
-
-  const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
-    type: 'recovery',
-    email,
-    options: { redirectTo: `${await siteUrl()}/auth/set-password` },
-  });
-  if (linkError || !linkData.properties?.action_link) {
-    return { message: `${shopName} is created, but no link could be made (${linkError?.message ?? 'unknown error'}). Use "Get sign-in link" on their row.` };
-  }
-  return { message: `${shopName} is created. Send ${email} this one-time link to choose their password. Open it in a private window if you test it yourself.`, link: linkData.properties.action_link };
+  return handover(email, method, password);
 }
 
 export async function setTenantStatus(tenantId: string, status: 'active' | 'suspended') {
@@ -135,9 +119,12 @@ export async function saveAiPersona(tenantId: string, formData: FormData) {
     tone: formData.get('tone'),
     adminInstructions: formData.get('adminInstructions'),
   });
-  const { error } = await createAdminClient().from('tenants').update({ ai_persona: persona }).eq('id', tenantId);
+  const { error } = await createAdminClient()
+    .from('tenant_ai_persona')
+    .upsert({ tenant_id: tenantId, persona, updated_at: new Date().toISOString() });
   if (error) await throwAudited('merchant.ai_persona', error, { actorId: user.id, tenantId });
-  await audit('merchant.ai_persona_changed', { actorId: user.id, tenantId, detail: persona });
+  // Which fields are set, never their text: shop members can read their shop's audit rows.
+  await audit('merchant.ai_persona_changed', { actorId: user.id, tenantId, detail: { fields: Object.keys(persona) } });
   revalidatePath(`/admin/tenants/${tenantId}`);
 }
 
@@ -300,17 +287,11 @@ export async function createInviteLink(tenantId: string): Promise<InviteLinkStat
     return { error: `${shop?.name ?? 'This shop'} is owned by a platform admin account (${profile.email}). A link here would reset your admin password. Use Forgot password on the sign-in page instead.` };
   }
 
-  // "recovery" rather than "invite": the account already exists, and recovery works whether or not they have
-  // ever set a password. generateLink returns the URL without sending anything.
-  const { data, error } = await admin.auth.admin.generateLink({
-    type: 'recovery',
-    email: profile.email,
-    options: { redirectTo: `${await siteUrl()}/auth/set-password` },
-  });
-  if (error || !data.properties?.action_link) return { error: error?.message ?? 'Could not create a link.' };
+  const res = await oneTimeLink(profile.email);
+  if ('error' in res) return { error: res.error };
 
   await audit('merchant.invite_link_created', { actorId: user.id, tenantId, detail: { email: profile.email } });
-  return { link: data.properties.action_link, email: profile.email, shopName: shop?.name };
+  return { link: res.link, email: profile.email, shopName: shop?.name };
 }
 
 // Undo an invite that went nowhere. Guarded hard: only a shop whose owner never signed in and that holds no

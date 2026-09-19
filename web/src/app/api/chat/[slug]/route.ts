@@ -20,11 +20,11 @@ const HISTORY_MESSAGES = 20;
 const STAFF_REPLY_TIMEOUT_MS = 5 * 60_000; // customer left waiting on staff this long -> the AI steps back in
 const STAFF_IDLE_HANDBACK_MS = 30 * 60_000; // staff silent this long -> the next customer message goes to the AI
 
-const TENANT_COLUMNS = 'id, name, business_category, status, ai_enabled, monthly_message_limit, policies, ai_persona, ai_playbook';
+const TENANT_COLUMNS = 'id, name, business_category, status, ai_enabled, monthly_message_limit, policies, ai_playbook';
 const CONVERSATION_COLUMNS = 'id, ai_muted, taken_over_at, last_staff_reply_at';
 
 type Db = ReturnType<typeof createAdminClient>;
-type Tenant = { id: string; name: string; business_category: string | null; status: string; ai_enabled: boolean; monthly_message_limit: number; policies: unknown; ai_persona: unknown; ai_playbook: unknown };
+type Tenant = { id: string; name: string; business_category: string | null; status: string; ai_enabled: boolean; monthly_message_limit: number; policies: unknown; ai_playbook: unknown };
 
 const fail = (status: number, error: string) => Response.json({ error }, { status });
 const ms = (iso: string | null | undefined) => (iso ? Date.parse(iso) : 0);
@@ -69,7 +69,9 @@ async function recentHistory(db: Db, conversationId: string) {
 // Runs the agent and saves its reply. Returns null when staff took over while the AI was thinking,
 // so the AI never talks over a person.
 async function aiReply(db: Db, input: AgentInput): Promise<ChatLine | null> {
-  const result = await runAgent(input);
+  // The admin's persona lives in its own service-role-only table (migration 018), never on the tenant row.
+  const { data: persona } = await db.from('tenant_ai_persona').select('persona').eq('tenant_id', input.tenant.id).maybeSingle();
+  const result = await runAgent({ ...input, tenant: { ...input.tenant, ai_persona: persona?.persona } });
 
   const { data: latest } = await db.from('conversations').select('ai_muted').eq('id', input.conversationId).single();
   if (latest?.ai_muted) return null;
