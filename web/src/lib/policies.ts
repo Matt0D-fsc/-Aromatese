@@ -40,3 +40,24 @@ export const policyPrompt = (policies: ShopPolicies) =>
   POLICY_FIELDS.filter((f) => policies[f.key])
     .map((f) => `- ${f.label}: ${policies[f.key]}`)
     .join('\n');
+
+// The two or three promises worth showing above the first message. A customer arriving from a Facebook link
+// decides in seconds whether this shop is real; these are the answers they would otherwise have to ask for.
+// Short, because they sit in one row on a phone — the full list is one tap away.
+const CHIP_ORDER: { key: PolicyKey; prefix?: string }[] = [
+  { key: 'payment' },
+  { key: 'deliveryInsideDhaka', prefix: 'Dhaka' },
+  { key: 'returns' },
+  { key: 'deliveryTime' },
+];
+const CHIP_MAX = 3;
+const CHIP_CHARS = 30;
+
+export function policyChips(policies: ShopPolicies): { key: PolicyKey; text: string }[] {
+  return CHIP_ORDER.flatMap(({ key, prefix }) => {
+    const value = policies[key];
+    if (!value) return [];
+    const text = prefix ? `${prefix} ${value}` : value;
+    return [{ key, text: text.length > CHIP_CHARS ? `${text.slice(0, CHIP_CHARS - 1).trimEnd()}…` : text }];
+  }).slice(0, CHIP_MAX);
+}

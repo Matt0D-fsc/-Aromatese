@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { mediaLabel, taka, type ChatLine, type ChatProduct } from '@/lib/chat';
-import { CheckIcon, CloseIcon, MicIcon, PhotoIcon, SendIcon } from '@/components/icons';
+import { CheckIcon, CloseIcon, InfoIcon, MicIcon, PhotoIcon, SendIcon } from '@/components/icons';
+import { POLICY_FIELDS, policyChips, type ShopPolicies } from '@/lib/policies';
 
 const MAX_RECORD_MS = 60_000;
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
@@ -15,12 +16,23 @@ const AUDIO_TYPES = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg;codecs=op
 
 const clock = (ms: number) => `${Math.floor(ms / 60_000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
 
-export function ChatClient({ slug, shopName, logoUrl, initial, since }: { slug: string; shopName: string; logoUrl?: string | null; initial: ChatLine[]; since: string | null }) {
+type ChatClientProps = {
+  slug: string;
+  shopName: string;
+  logoUrl?: string | null;
+  aiActive: boolean;
+  policies: ShopPolicies;
+  initial: ChatLine[];
+  since: string | null;
+};
+
+export function ChatClient({ slug, shopName, logoUrl, aiActive, policies, initial, since }: ChatClientProps) {
   const [lines, setLines] = useState(initial);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [recording, setRecording] = useState(false);
+  const [showPolicies, setShowPolicies] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [levels, setLevels] = useState<number[]>(() => Array(LEVEL_BARS).fill(0));
   const recorder = useRef<MediaRecorder | null>(null);
@@ -30,6 +42,8 @@ export function ChatClient({ slug, shopName, logoUrl, initial, since }: { slug: 
   const ticker = useRef<ReturnType<typeof setInterval> | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const cursor = useRef(since);
+
+  const chips = policyChips(policies);
 
   // Adds lines not already on screen and moves the "seen up to" cursor forward.
   const append = useCallback((incoming: ChatLine[]) => {
@@ -187,26 +201,101 @@ export function ChatClient({ slug, shopName, logoUrl, initial, since }: { slug: 
 
   return (
     <div className="mx-auto flex h-dvh max-w-2xl flex-col bg-background">
-      <header className="flex items-center gap-3 border-b border-line bg-surface px-4 py-3">
-        {logoUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={logoUrl} alt="" className="h-10 w-10 shrink-0 rounded-full border border-line object-cover" />
-        )}
-        <div className="min-w-0">
-          <p className="truncate font-semibold">{shopName}</p>
-          <p className="text-xs text-zinc-500">AI sales assistant · Bangla, Banglish or English</p>
+      <header className="border-b border-line bg-surface px-4 pb-2.5 pt-3">
+        <div className="flex items-center gap-3">
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt="" className="h-10 w-10 shrink-0 rounded-full border border-line object-cover" />
+          ) : (
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-semibold text-accent-foreground">
+              {shopName.slice(0, 2).toUpperCase()}
+            </span>
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-semibold">{shopName}</p>
+            {/* Honest about who is on the other end: the AI really does answer at once, and when the shop
+                has paused it, saying so beats a promise nobody is keeping. */}
+            <p className="mt-0.5 flex items-center gap-1.5 text-xs text-zinc-500">
+              {aiActive && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />}
+              {aiActive ? 'Shathe shathe reply · Bangla, Banglish or English' : 'Shop team ekhane reply debe'}
+            </p>
+          </div>
+          {Object.keys(policies).length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowPolicies((v) => !v)}
+              aria-expanded={showPolicies}
+              aria-label="Shop information"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control text-zinc-500 hover:bg-content2"
+            >
+              <InfoIcon />
+            </button>
+          )}
         </div>
+
+        {chips.length > 0 && (
+          <div className="mt-2.5 flex gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {chips.map((chip, i) => (
+              <span
+                key={chip.key}
+                className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${
+                  i === 0 ? 'bg-accent-soft text-accent-strong' : 'bg-content2 text-zinc-600'
+                }`}
+              >
+                {chip.text}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {showPolicies && (
+          <dl className="mt-2.5 space-y-1.5 rounded-control bg-content2 p-3 text-xs">
+            {POLICY_FIELDS.filter((field) => policies[field.key]).map((field) => (
+              <div key={field.key} className="flex gap-3">
+                <dt className="w-32 shrink-0 text-zinc-500">{field.label}</dt>
+                <dd className="min-w-0 flex-1">{policies[field.key]}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
       </header>
 
       <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
         {lines.length === 0 && (
-          <Bubble mine={false}>
-            <p>Assalamu alaikum! Ki khujchen?</p>
-            <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-zinc-500">
-              Likhun, <MicIcon size={15} className="inline-block" /> voice note pathan, ba
-              <PhotoIcon size={15} className="inline-block" /> chobi din.
-            </p>
-          </Bubble>
+          <>
+            <Bubble mine={false}>
+              <p>Assalamu alaikum! Ki khujchen?</p>
+              <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-zinc-500">
+                Likhun, <MicIcon size={15} className="inline-block" /> voice note pathan, ba
+                <PhotoIcon size={15} className="inline-block" /> chobi din.
+              </p>
+            </Bubble>
+
+            {/* Sending a photo is the thing this shop's AI does that a Facebook comment cannot, so it is
+                offered before anyone has to think of it. The label opens the composer's own file input. */}
+            <div className="space-y-2 pt-1">
+              <label
+                htmlFor="chat-photo"
+                className="flex min-h-12 cursor-pointer items-center gap-2.5 rounded-control border border-line bg-surface px-4 text-[15px] transition-colors duration-150 hover:bg-content2"
+              >
+                <PhotoIcon size={18} className="shrink-0 text-accent" />
+                Chobi ache? Pathan, khuje dibo
+              </label>
+              <div className="flex gap-2">
+                {['Notun ki ache?', 'Ki ki ache dekhan'].map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => send(prompt)}
+                    disabled={busy}
+                    className="min-h-11 flex-1 rounded-control border border-line bg-surface px-3 text-sm transition-colors duration-150 hover:bg-content2 disabled:opacity-50"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
         )}
         {lines.map((line) => (
           <div key={line.id} className="space-y-2">
@@ -296,6 +385,7 @@ export function ChatClient({ slug, shopName, logoUrl, initial, since }: { slug: 
             <label className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-control border border-line text-zinc-600 hover:bg-content2" aria-label="Send a photo">
               <PhotoIcon />
               <input
+                id="chat-photo"
                 type="file"
                 accept="image/*"
                 className="sr-only"
