@@ -71,6 +71,6 @@ Status as of 2026-09-19. The pre-launch build scope lives in SCOPE.md; all three
 - [x] Platform owner: plans and price per shop, AI cost in taka, audit log
 
 ## 5. Code health
-- [ ] Delete the old Express demo server and its 9 stale tests
+- [x] Delete the old Express demo server and its 9 stale tests
 - [ ] Add real tests for the AI agent and the chat API route
 - [ ] Mavs Gateway phase 2: streaming tool calls (for other company agents)

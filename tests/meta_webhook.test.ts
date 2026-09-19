@@ -1,6 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchAttachment, parseWebhook, sendMessage, verifySignature, verifySignedRequest } from '../web/src/lib/meta.js';
+import { fetchCalls } from './fetch-calls.js';
 
 // The Messenger/Instagram wire protocol. Two things here are security, not formatting: an unsigned webhook
 // must never be accepted, and our own replies echoed back must never be answered (the agent would talk to
@@ -126,7 +127,7 @@ describe('sendMessage', () => {
     vi.stubGlobal('fetch', fetchMock);
     await sendMessage(account, 'psid-abc', 'Ei saree tar dam 2500 taka.');
 
-    const [url, init] = fetchMock.mock.calls[0];
+    const [url, init] = fetchCalls(fetchMock)[0];
     expect(url).toContain('/1015551234/messages');
     expect((init.headers as Record<string, string>).authorization).toBe('Bearer page-token-not-real');
     expect(JSON.parse(init.body as string)).toEqual({ recipient: { id: 'psid-abc' }, message: { text: 'Ei saree tar dam 2500 taka.' }, messaging_type: 'RESPONSE' });
@@ -138,7 +139,7 @@ describe('sendMessage', () => {
     const long = Array.from({ length: 60 }, (_, i) => `${i}. Silk saree, 2500 taka, stock ache`).join('\n');
     await sendMessage(account, 'psid-abc', long);
 
-    const chunks = fetchMock.mock.calls.map((c) => JSON.parse(c[1].body as string).message.text);
+    const chunks = fetchCalls(fetchMock).map(([, init]) => JSON.parse(init.body as string).message.text as string);
     expect(chunks.length).toBeGreaterThan(1);
     expect(chunks.every((c: string) => c.length <= 2000)).toBe(true);
     // Nothing lost and nothing reordered: the lines arrive as they were written.
@@ -160,7 +161,7 @@ describe('sendMessage', () => {
 
 describe('fetchAttachment', () => {
   const photo = { url: 'https://cdn.meta/1.jpg', kind: 'image' as const };
-  const reply = (body: Buffer | string, headers: Record<string, string>, status = 200) => new Response(body, { status, headers });
+  const reply = (body: Uint8Array | string, headers: Record<string, string>, status = 200) => new Response(body as BodyInit, { status, headers });
 
   afterEach(() => vi.unstubAllGlobals());
 

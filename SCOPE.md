@@ -109,7 +109,7 @@ Messenger, then Instagram and WhatsApp.
 
 ## How this was verified
 
-Every tier: `npm run build`, `tsc --noEmit` and `eslint src` clean, plus six vitest cases in
+Every tier: `npm run build`, `tsc --noEmit` and `eslint` clean in `web/`, plus six vitest cases in
 `tests/web_lib.test.ts` covering the pure helpers that are easy to get quietly wrong — media paths, media notes,
 search-input sanitising and CSV formula escaping.
 

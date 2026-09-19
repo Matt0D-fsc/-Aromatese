@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { exchangeCode, listPages, oauthUrl, setPageSubscription } from '../web/src/lib/meta.js';
+import { fetchCalls } from './fetch-calls.js';
 
 // Connecting a merchant's Facebook Page. The trap here is token lifetime: a Page token inherits the lifetime
 // of the user token it came from, so connecting with the short-lived one Meta hands back would leave a shop
@@ -36,12 +37,12 @@ describe('exchangeCode', () => {
 
     expect(await exchangeCode('the-code', REDIRECT)).toBe('long-lived');
 
-    const first = new URL(fetchMock.mock.calls[0][0] as string).searchParams;
+    const first = new URL(fetchCalls(fetchMock)[0][0]).searchParams;
     expect(first.get('code')).toBe('the-code');
     expect(first.get('client_secret')).toBe('app-secret-not-real');
 
     // The second call is the one that matters: without it the Page token expires within the hour.
-    const second = new URL(fetchMock.mock.calls[1][0] as string).searchParams;
+    const second = new URL(fetchCalls(fetchMock)[1][0]).searchParams;
     expect(second.get('grant_type')).toBe('fb_exchange_token');
     expect(second.get('fb_exchange_token')).toBe('short-lived');
   });
@@ -68,7 +69,7 @@ describe('listPages', () => {
     expect(pages.map((p) => p.id)).toEqual(['page-1', 'page-2']);
     expect(pages[0].instagram_business_account?.id).toBe('ig-77');
     // Without instagram_business_account in the fields, an Instagram-linked Page would look Messenger-only.
-    expect(new URL(fetchMock.mock.calls[0][0] as string).searchParams.get('fields')).toContain('instagram_business_account');
+    expect(new URL(fetchCalls(fetchMock)[0][0]).searchParams.get('fields')).toContain('instagram_business_account');
   });
 
   it('returns nothing when the account manages no Page', async () => {
@@ -85,7 +86,7 @@ describe('setPageSubscription', () => {
     vi.stubGlobal('fetch', fetchMock);
     await setPageSubscription(page, true);
 
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const [url, init] = fetchCalls(fetchMock)[0];
     expect(init.method).toBe('POST');
     expect(url).toContain('/page-1/subscribed_apps');
     expect(new URL(url).searchParams.get('subscribed_fields')).toBe('messages,messaging_postbacks');
@@ -96,7 +97,7 @@ describe('setPageSubscription', () => {
     vi.stubGlobal('fetch', fetchMock);
     await setPageSubscription(page, false);
 
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const [url, init] = fetchCalls(fetchMock)[0];
     expect(init.method).toBe('DELETE');
     expect(new URL(url).searchParams.has('subscribed_fields')).toBe(false);
   });

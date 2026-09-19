@@ -1,10 +1,9 @@
 {
   "name": "mattic-ai-sales-agent",
   "version": "0.1.0",
-  "description": "Multi-tenant, omnichannel AI sales & order-taking agent for Bangladeshi and global e-commerce/F-commerce merchants.",
-  "main": "dist/index.js",
+  "description": "Multi-tenant, omnichannel AI sales & order-taking agent for Bangladeshi and global e-commerce/F-commerce merchants. The application lives in web/; this package holds the tests that run against it.",
+  "private": true,
   "scripts": {
-    "build": "tsc",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -21,15 +20,8 @@
   "author": "NB Tech",
   "license": "MIT",
   "devDependencies": {
-    "@types/express": "^5.0.6",
     "@types/node": "^22.10.1",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
-  },
-  "dependencies": {
-    "@google/genai": "^2.16.0",
-    "@supabase/supabase-js": "^2.47.10",
-    "dotenv": "^16.4.7",
-    "express": "^5.2.1"
   }
 }

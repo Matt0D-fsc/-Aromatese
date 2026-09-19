@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { fetchCalls } from './fetch-calls.js';
 
 // Sending a staff reply back out to the channel the customer is actually on. The case that matters most is
 // the boring one: a web chat must not touch Meta at all, because that path carries every existing shop.
@@ -49,7 +50,7 @@ describe('deliverToConversation', () => {
     vi.stubGlobal('fetch', fetchMock);
     await deliverToConversation(TENANT, CONVERSATION, 'Apnar order confirm hoyeche.');
 
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const [url, init] = fetchCalls(fetchMock)[0];
     expect(url).toContain('/1015551234/messages');
     expect(JSON.parse(init.body as string).recipient).toEqual({ id: 'psid-abc' });
   });
