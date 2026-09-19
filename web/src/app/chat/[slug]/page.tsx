@@ -11,13 +11,21 @@ type Props = { params: Promise<{ slug: string }> };
 
 // Public page: the service role reads only this shop's name and this visitor's own thread (keyed by an httpOnly cookie).
 const getShop = cache(async (slug: string) => {
-  const { data } = await createAdminClient().from('tenants').select('id, name, status, logo_url, ai_enabled, policies').eq('slug', slug).maybeSingle();
+  const { data } = await createAdminClient().from('tenants').select('id, name, status, logo_url, ai_enabled, policies, contact_phone, business_category').eq('slug', slug).maybeSingle();
   return data?.status === 'active' ? data : null;
 });
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const shop = await getShop((await params).slug);
-  return { title: shop ? `Chat with ${shop.name}` : 'Shop not found' };
+  if (!shop) return { title: 'Shop not found' };
+  // What Facebook, WhatsApp and Messenger show when the link is shared: the shop's logo and what the chat does.
+  const title = `Chat with ${shop.name}`;
+  const description = `${shop.business_category ? `${shop.business_category}. ` : ''}Ask in Bangla, Banglish or English, send a photo or a voice note, and order in the chat.`;
+  return {
+    title,
+    description,
+    openGraph: { title, description, type: 'website', ...(shop.logo_url && { images: [{ url: shop.logo_url, alt: shop.name }] }) },
+  };
 }
 
 export default async function ChatPage({ params }: Props) {
@@ -57,6 +65,7 @@ export default async function ChatPage({ params }: Props) {
       logoUrl={shop.logo_url}
       aiActive={Boolean(shop.ai_enabled)}
       policies={readPolicies(shop.policies)}
+      phone={shop.contact_phone}
       initial={initial}
       since={initial.at(-1)?.createdAt ?? null}
     />

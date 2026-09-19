@@ -93,6 +93,18 @@ export const TOOLS: FunctionDeclaration[] = [
     },
   },
   {
+    name: 'order_status',
+    description:
+      "Look up this customer's orders and where each one stands. Returns the orders placed in this chat. For an order placed from another phone or browser, pass both its order number and the phone number it was placed with.",
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        order_number: { type: 'string', description: 'Optional: the order number the customer gives, e.g. CN-MU3CI1OK80C' },
+        phone: { type: 'string', description: 'Optional: the mobile number the order was placed with. Needed together with order_number.' },
+      },
+    },
+  },
+  {
     name: 'customer_history',
     description:
       "This customer's past orders with this shop: how many, how many confirmed or cancelled, and total spent. " +
@@ -137,6 +149,7 @@ FACTS
 - Voice note: understand what they asked, then act on it. Photo: identify the item (type, colour, pattern, brand) and search for it or similar items.
 - When recommending specific products, call show_products so the customer sees cards. Show 1-3 at a time.
 - Lines in [square brackets] inside earlier messages are system notes. Never write them yourself.
+- When a customer asks about an order they already placed, call order_status. "new" means the shop has not called to confirm it yet; "confirmed" means the shop confirmed it; "cancelled" means it will not be sent. You do not know courier or delivery dates: say the shop will update them.
 
 SELLING: adapt to how the customer behaves
 - Browsing or unsure: ask one short question (budget, occasion, colour, size), then suggest 2-3 options.
@@ -257,6 +270,7 @@ const toCard = (p: ProductRecord): ChatProduct => ({
   regularPrice: p.discount_price_bdt != null ? Number(p.price_bdt) : null,
   stock: p.stock_quantity,
   imageUrl: p.image_urls?.[0] ?? null,
+  imageUrls: (p.image_urls ?? []).slice(0, 10),
 });
 
 async function runTool(name: string, args: Record<string, unknown>, ctx: Ctx): Promise<Record<string, unknown>> {
@@ -312,6 +326,35 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: Ctx): P
   }
 
   if (name === 'place_order') return placeOrder(args, ctx);
+
+  // A number alone is not enough to see someone's order: it must come with the phone it was placed with.
+  if (name === 'order_status') {
+    const number = String(args.order_number ?? '').toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 40);
+    const phone = String(args.phone ?? '').replace(/[\s-]/g, '');
+    let query = db.from('orders').select('order_number, status, total_bdt, created_at, items').eq('tenant_id', tenantId);
+    // Both values are reduced to safe characters above before they go into the filter string.
+    query =
+      number && BD_MOBILE.test(phone)
+        ? query.or(`customer_id.eq.${input.customerId},and(order_number.eq.${number},shipping_address->>phone.like.*${phone.slice(-10)})`)
+        : query.eq('customer_id', input.customerId);
+    const { data, error } = await query.order('created_at', { ascending: false }).limit(5);
+    if (error) throw error;
+    const STATUS: Record<string, string> = {
+      draft: 'new: waiting for the shop to call and confirm',
+      confirmed: 'confirmed by the shop',
+      cancelled: 'cancelled',
+    };
+    const orders = (data ?? []).map((o) => ({
+      order_number: o.order_number,
+      status: STATUS[o.status] ?? o.status,
+      placed_at: o.created_at,
+      total_bdt: Number(o.total_bdt),
+      items: ((o.items ?? []) as { title: string; quantity: number }[]).map((i) => `${i.quantity} x ${i.title}`),
+    }));
+    return orders.length
+      ? { orders }
+      : { orders, note: number ? 'No order matches that number and phone together. Ask them to check both.' : 'No orders from this chat. Ask for the order number and the phone number used.' };
+  }
 
   // Counts only, never names or addresses: a customer can type any phone number here.
   if (name === 'customer_history') {

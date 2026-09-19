@@ -17,6 +17,8 @@ export type ChatProduct = {
   regularPrice: number | null;
   stock: number;
   imageUrl: string | null;
+  // Every photo, cover first. Absent on cards saved before the gallery existed; those fall back to imageUrl.
+  imageUrls?: string[];
 };
 
 // What the AI heard in a voice note or saw in a photo, kept so later turns and the merchant's inbox still have it.

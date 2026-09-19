@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { mediaLabel, taka, type ChatLine, type ChatProduct } from '@/lib/chat';
-import { CheckIcon, CloseIcon, InfoIcon, MicIcon, PhotoIcon, SendIcon } from '@/components/icons';
+import { CheckIcon, CloseIcon, InfoIcon, MicIcon, PhoneIcon, PhotoIcon, SendIcon } from '@/components/icons';
 import { POLICY_FIELDS, policyChips, type ShopPolicies } from '@/lib/policies';
 import { shrinkImage } from '@/lib/shrink-image';
 
@@ -23,17 +23,19 @@ type ChatClientProps = {
   logoUrl?: string | null;
   aiActive: boolean;
   policies: ShopPolicies;
+  phone?: string | null;
   initial: ChatLine[];
   since: string | null;
 };
 
-export function ChatClient({ slug, shopName, logoUrl, aiActive, policies, initial, since }: ChatClientProps) {
+export function ChatClient({ slug, shopName, logoUrl, aiActive, policies, phone, initial, since }: ChatClientProps) {
   const [lines, setLines] = useState(initial);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [recording, setRecording] = useState(false);
   const [showPolicies, setShowPolicies] = useState(false);
+  const [gallery, setGallery] = useState<{ title: string; photos: string[] } | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [levels, setLevels] = useState<number[]>(() => Array(LEVEL_BARS).fill(0));
   const recorder = useRef<MediaRecorder | null>(null);
@@ -219,9 +221,19 @@ export function ChatClient({ slug, shopName, logoUrl, aiActive, policies, initia
                 has paused it, saying so beats a promise nobody is keeping. */}
             <p className="mt-0.5 flex items-center gap-1.5 text-xs text-zinc-500">
               {aiActive && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />}
-              {aiActive ? 'Shathe shathe reply · Bangla, Banglish or English' : 'Shop team ekhane reply debe'}
+              {aiActive ? 'AI assistant · shathe shathe reply' : 'Shop team ekhane reply debe'}
             </p>
           </div>
+          {/* The way out of any chat that is not going well, and the only one once the customer leaves the page. */}
+          {phone && (
+            <a
+              href={`tel:${phone.replace(/[^\d+]/g, '')}`}
+              aria-label={`Call ${shopName}`}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control text-zinc-500 hover:bg-content2"
+            >
+              <PhoneIcon />
+            </a>
+          )}
           {Object.keys(policies).length > 0 && (
             <button
               type="button"
@@ -266,7 +278,8 @@ export function ChatClient({ slug, shopName, logoUrl, aiActive, policies, initia
         {lines.length === 0 && (
           <>
             <Bubble mine={false}>
-              <p>Assalamu alaikum! Ki khujchen?</p>
+              {/* Said up front, as Meta's platform policy asks of automated chats: the customer knows who is answering. */}
+              <p>{aiActive ? `Assalamu alaikum! Ami ${shopName}-er AI assistant. Ki khujchen?` : 'Assalamu alaikum! Ki khujchen?'}</p>
               <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-zinc-500">
                 Likhun, <MicIcon size={15} className="inline-block" /> voice note pathan, ba
                 <PhotoIcon size={15} className="inline-block" /> chobi din.
@@ -325,7 +338,7 @@ export function ChatClient({ slug, shopName, logoUrl, aiActive, policies, initia
             {line.products.length > 0 && (
               <div className="flex gap-3 overflow-x-auto pb-1">
                 {line.products.map((p) => (
-                  <ProductCard key={p.id} product={p} disabled={busy} onOrder={() => send(`I want to order: ${p.title}`)} />
+                  <ProductCard key={p.id} product={p} disabled={busy} onOrder={() => send(`I want to order: ${p.title}`)} onPhotos={(photos) => setGallery({ title: p.title, photos })} />
                 ))}
               </div>
             )}
@@ -431,6 +444,37 @@ export function ChatClient({ slug, shopName, logoUrl, aiActive, policies, initia
           </form>
         )}
       </div>
+      {gallery && <Gallery title={gallery.title} photos={gallery.photos} onClose={() => setGallery(null)} />}
+    </div>
+  );
+}
+
+// Every photo of a product, full width, swiped sideways. The card shows one; a customer deciding on a saree
+// wants the back, the border and the fabric up close.
+function Gallery({ title, photos, onClose }: { title: string; photos: string[]; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div role="dialog" aria-modal="true" aria-label={`Photos of ${title}`} className="fixed inset-0 z-30 flex flex-col bg-black/95 text-white">
+      <div className="flex items-center gap-3 px-4 py-3">
+        <p className="min-w-0 flex-1 truncate font-semibold">{title}</p>
+        <span className="text-sm text-white/70">{photos.length === 1 ? "1 photo" : `${photos.length} photos`}</span>
+        <button type="button" onClick={onClose} aria-label="Close photos" className="flex h-11 w-11 items-center justify-center rounded-control hover:bg-white/10">
+          <CloseIcon />
+        </button>
+      </div>
+      <div className="flex flex-1 snap-x snap-mandatory overflow-x-auto">
+        {photos.map((src, i) => (
+          <div key={src} className="flex w-full shrink-0 snap-center items-center justify-center p-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={src} alt={`${title}, photo ${i + 1} of ${photos.length}`} className="max-h-full max-w-full object-contain" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -449,17 +493,24 @@ function Bubble({ mine, children }: { mine: boolean; children: React.ReactNode }
   );
 }
 
-function ProductCard({ product: p, onOrder, disabled }: { product: ChatProduct; onOrder: () => void; disabled: boolean }) {
+function ProductCard({ product: p, onOrder, onPhotos, disabled }: { product: ChatProduct; onOrder: () => void; onPhotos: (photos: string[]) => void; disabled: boolean }) {
+  const photos = p.imageUrls?.length ? p.imageUrls : p.imageUrl ? [p.imageUrl] : [];
   return (
     <div className="w-44 shrink-0 overflow-hidden rounded-card border border-line bg-surface">
-      <div className="aspect-square bg-content2">
-        {p.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={p.imageUrl} alt={p.title} className="h-full w-full object-cover" />
-        ) : (
-          <div className="flex h-full items-center justify-center text-xs text-zinc-400">No photo</div>
-        )}
-      </div>
+      {photos.length ? (
+        <button type="button" onClick={() => onPhotos(photos)} className="relative block aspect-square w-full bg-content2" aria-label={`See ${photos.length === 1 ? 'the photo' : `all ${photos.length} photos`} of ${p.title}`}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={photos[0]} alt={p.title} className="h-full w-full object-cover" />
+          {photos.length > 1 && (
+            <span className="absolute bottom-1.5 right-1.5 flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-semibold text-white">
+              <PhotoIcon size={12} />
+              {photos.length}
+            </span>
+          )}
+        </button>
+      ) : (
+        <div className="flex aspect-square items-center justify-center bg-content2 text-xs text-zinc-400">No photo</div>
+      )}
       <div className="space-y-1 p-2.5 text-sm">
         <p className="line-clamp-2 font-medium leading-snug">{p.title}</p>
         <p className="font-semibold tabular-nums">
