@@ -5,7 +5,8 @@ import { btnGhost } from '@/components/ui';
 import { LiveRefresh } from '@/components/live-refresh';
 import { LanguageToggle } from '@/components/language-toggle';
 import { BottomTabs, TopNav, type NavLink } from '@/components/dashboard-nav';
-import { getLang, t } from '@/lib/i18n';
+import { t } from '@/lib/i18n';
+import { getLang } from '@/lib/i18n-server';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { getTheme } from '@/lib/theme';
 

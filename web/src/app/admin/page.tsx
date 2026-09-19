@@ -7,6 +7,7 @@ import { GEMINI_MODEL } from '@/lib/gemini';
 import { AiEngineForm } from './ai-engine-form';
 import { InviteForm } from './invite-form';
 import { RetentionForm } from './retention-form';
+import { InviteAccess } from './invite-access';
 import { setAiEnabled, setTenantStatus, setTokenRate, updateMessageLimit } from './actions';
 
 type TenantRow = {
@@ -35,16 +36,27 @@ type UsageRow = { tenant_id: string; messages: number; conversations: number; or
 export default async function AdminPage() {
   const { supabase } = await requireAdmin();
 
-  const [{ data }, { data: usageData }, { data: auditData }] = await Promise.all([
+  const [{ data }, { data: usageData }, { data: auditData }, { data: signinData }, { data: ownerData }] = await Promise.all([
     supabase
       .from('tenants')
       .select('id, name, slug, status, contact_email, monthly_message_limit, ai_enabled, plan, plan_price_bdt, onboarding_completed_at, created_at, products(count)')
       .order('created_at', { ascending: false }),
     supabase.from('tenant_usage_month').select('*'),
     supabase.from('audit_logs').select('id, event_type, tenant_id, actor_id, detail, created_at').order('created_at', { ascending: false }).limit(AUDIT_FEED_SIZE),
+    supabase.rpc('merchant_signin_status'),
+    supabase.from('tenant_members').select('tenant_id, user_id').eq('role', 'owner'),
   ]);
   const tenants = (data ?? []) as TenantRow[];
   const activity = (auditData ?? []) as AuditRow[];
+
+  // Where each merchant actually got stuck: never opened the invite, opened it but never finished setup, or live.
+  const signedInAt = new Map(((signinData ?? []) as { user_id: string; last_sign_in_at: string | null }[]).map((s) => [s.user_id, s.last_sign_in_at]));
+  const ownerOf = new Map(((ownerData ?? []) as { tenant_id: string; user_id: string }[]).map((m) => [m.tenant_id, m.user_id]));
+  const accessOf = (tenantId: string) => {
+    const owner = ownerOf.get(tenantId);
+    if (!owner) return { label: 'No account', opened: false };
+    return signedInAt.get(owner) ? { label: 'Signed in', opened: true } : { label: 'Never opened invite', opened: false };
+  };
 
   // audit_logs.actor_id points at auth.users, which PostgREST cannot join to profiles, so the names are
   // looked up in one extra query and matched here.
@@ -146,6 +158,7 @@ export default async function AdminPage() {
               )}
               {tenants.map((t) => {
                 const u = usage.get(t.id);
+                const access = accessOf(t.id);
                 const used = u?.messages ?? 0;
                 const overLimit = used >= t.monthly_message_limit;
                 return (
@@ -153,11 +166,17 @@ export default async function AdminPage() {
                     <td className="px-6 py-4">
                       <Link href={`/admin/tenants/${t.id}`} className="font-medium hover:underline">{t.name}</Link>
                       <div className="text-xs text-zinc-500">{t.contact_email}</div>
-                      {!t.onboarding_completed_at ? (
-                        <div className="text-xs text-warning">Setup not finished</div>
+                      {/* Three states, not two: never opening the invite is a different problem from abandoning setup. */}
+                      {!access.opened ? (
+                        <div className="text-xs text-warning">{access.label}</div>
+                      ) : !t.onboarding_completed_at ? (
+                        <div className="text-xs text-warning">Signed in, setup not finished</div>
                       ) : (
                         <Link href={`/chat/${t.slug}`} target="_blank" className="text-xs underline">Open chat ↗</Link>
                       )}
+                      <div className="mt-2 max-w-xs">
+                        <InviteAccess tenantId={t.id} neverSignedIn={!access.opened} />
+                      </div>
                     </td>
                     <td className="px-3 py-4">
                       <span className={statusBadge(t.status)}>{t.status}</span>

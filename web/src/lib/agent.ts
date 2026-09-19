@@ -71,7 +71,15 @@ export const TOOLS: FunctionDeclaration[] = [
           type: 'array',
           items: {
             type: 'object',
-            properties: { product_id: { type: 'string' }, quantity: { type: 'integer' } },
+            properties: {
+              product_id: { type: 'string' },
+              quantity: { type: 'integer' },
+              variant: {
+                type: 'string',
+                description:
+                  'The exact variant name from search_products, e.g. "L" or "Red". Required when the product has variants, because the price and the stock come from the variant, not the product.',
+              },
+            },
             required: ['product_id', 'quantity'],
           },
         },
@@ -111,7 +119,7 @@ STYLE
 ${policies ? `SHOP POLICIES — these are confirmed by the shop. State them plainly when asked; never add to them.\n${policies}\n` : ''}
 FACTS
 - Only state product names, prices, discounts, stock and details returned by your tools in this conversation. Never guess prices, stock, sizes, delivery time, delivery charge or policies. Anything not listed under SHOP POLICIES above is something you do not know: say the shop will confirm it.
-- A product that returns variants has sizes or colours: state the exact variant names, their prices and which are in stock. Never invent a size or colour that is not listed.
+- A product that returns variants has sizes or colours: state the exact variant names, their prices and which are in stock. Never invent a size or colour that is not listed. Before ordering one of these, ask which variant they want and pass its exact name as "variant" in place_order — the price and the stock come from the variant, not the product.
 - For any product question, call search_products first. If nothing matches, retry once with synonyms (English/Banglish/Bangla), then suggest the closest available products.
 - Voice note: understand what they asked, then act on it. Photo: identify the item (type, colour, pattern, brand) and search for it or similar items.
 - When recommending specific products, call show_products so the customer sees cards. Show 1-3 at a time.
@@ -309,35 +317,64 @@ async function placeOrder(args: Record<string, unknown>, ctx: Ctx): Promise<Reco
   if (!BD_MOBILE.test(phone)) return { error: 'Invalid phone. Ask for a valid Bangladeshi mobile number like 01712345678.' };
   if (address.length < 10) return { error: 'Ask for the full delivery address (house/road, area, district).' };
 
-  const quantities = new Map<string, number>();
+  // Keyed by product and variant: two sizes of the same dress are two lines, priced and stocked separately.
+  const quantities = new Map<string, { productId: string; variant: string | null; qty: number }>();
   for (const item of Array.isArray(args.items) ? (args.items as Record<string, unknown>[]) : []) {
     const id = String(item?.product_id ?? '');
     const qty = Math.floor(Number(item?.quantity));
+    const variant = item?.variant == null ? null : String(item.variant).trim().slice(0, 100) || null;
     if (!UUID.test(id) || !(qty >= 1 && qty <= 20)) return { error: 'Each item needs a product_id from search_products and a quantity from 1 to 20.' };
-    quantities.set(id, (quantities.get(id) ?? 0) + qty);
+    const key = `${id}::${variant ?? ''}`;
+    const line = quantities.get(key);
+    if (line) line.qty += qty;
+    else quantities.set(key, { productId: id, variant, qty });
   }
-  if (quantities.size < 1 || quantities.size > 10) return { error: 'An order needs 1 to 10 different products.' };
+  if (quantities.size < 1 || quantities.size > 10) return { error: 'An order needs 1 to 10 different items.' };
 
-  const { data: rows, error: productError } = await db
-    .from('products')
-    .select('id, sku, title_en, price_bdt, discount_price_bdt, stock_quantity, is_active')
-    .eq('tenant_id', input.tenant.id)
-    .in('id', [...quantities.keys()]);
+  const productIds = [...new Set([...quantities.values()].map((l) => l.productId))];
+  const [{ data: rows, error: productError }, { data: variantRows, error: variantError }] = await Promise.all([
+    db.from('products').select('id, sku, title_en, price_bdt, discount_price_bdt, stock_quantity, is_active').eq('tenant_id', input.tenant.id).in('id', productIds),
+    db.from('variants').select('product_id, name, price_bdt, stock_quantity').eq('tenant_id', input.tenant.id).in('product_id', productIds),
+  ]);
   if (productError) throw productError;
+  if (variantError) throw variantError;
 
-  // Prices come from the database, never from the model.
+  // Prices come from the database, never from the model — and from the variant's row when one was chosen,
+  // so a size that costs more is charged at its own price and taken out of its own stock.
   const items = [];
-  for (const [id, qty] of quantities) {
-    const p = rows?.find((r) => r.id === id);
-    if (!p || !p.is_active) return { error: `Product ${id} is not available. Search again.` };
-    if (p.stock_quantity < qty) return { error: `Only ${p.stock_quantity} of ${p.title_en} in stock.` };
-    items.push({ product_id: id, sku: p.sku, title: p.title_en, quantity: qty, unit_price: Number(p.discount_price_bdt ?? p.price_bdt) });
+  for (const { productId, variant, qty } of quantities.values()) {
+    const p = rows?.find((r) => r.id === productId);
+    if (!p || !p.is_active) return { error: `Product ${productId} is not available. Search again.` };
+
+    const productVariants = (variantRows ?? []).filter((v) => v.product_id === productId);
+    if (productVariants.length && !variant) {
+      return { error: `${p.title_en} comes in ${productVariants.map((v) => v.name).join(', ')}. Ask which one they want and pass it as "variant".` };
+    }
+
+    let unitPrice = Number(p.discount_price_bdt ?? p.price_bdt);
+    if (variant) {
+      const chosen = productVariants.find((v) => v.name.toLowerCase() === variant.toLowerCase());
+      if (!chosen) return { error: `${p.title_en} has no "${variant}". Available: ${productVariants.map((v) => v.name).join(', ') || 'none'}.` };
+      if (chosen.stock_quantity < qty) return { error: `Only ${chosen.stock_quantity} of ${p.title_en} (${chosen.name}) in stock.` };
+      unitPrice = Number(chosen.price_bdt ?? p.discount_price_bdt ?? p.price_bdt);
+    } else if (p.stock_quantity < qty) {
+      return { error: `Only ${p.stock_quantity} of ${p.title_en} in stock.` };
+    }
+
+    items.push({
+      product_id: productId,
+      sku: p.sku,
+      title: variant ? `${p.title_en} (${variant})` : p.title_en,
+      ...(variant ? { variant } : {}),
+      quantity: qty,
+      unit_price: unitPrice,
+    });
   }
   const total = items.reduce((sum, i) => sum + i.unit_price * i.quantity, 0);
 
   // Same chat + phone + items = same order, so a repeated tool call can't create a duplicate.
   const idempotencyKey = createHash('sha256')
-    .update(JSON.stringify([input.conversationId, phone, [...quantities].sort()]))
+    .update(JSON.stringify([input.conversationId, phone, [...quantities.keys()].sort()]))
     .digest('hex');
   const orderNumber = `CN-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
 

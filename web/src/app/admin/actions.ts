@@ -242,3 +242,61 @@ export async function setTokenRate(formData: FormData) {
   await audit('platform.token_rate_changed', { actorId: user.id, detail: { rate } });
   revalidatePath('/admin');
 }
+
+export type InviteLinkState = { error?: string; link?: string; email?: string };
+
+// A one-time link the admin can copy and send over WhatsApp. Bangladeshi merchants are reachable there far
+// more reliably than by email, and this removes the dependency on SMTP for onboarding entirely.
+// It doubles as the resend: the same call works whether the first email never arrived, the link expired, or
+// the merchant forgot their password — they always land on /auth/set-password and choose their own.
+export async function createInviteLink(tenantId: string): Promise<InviteLinkState> {
+  const { user } = await requireAdmin();
+  const admin = createAdminClient();
+
+  const { data: member } = await admin.from('tenant_members').select('user_id').eq('tenant_id', tenantId).eq('role', 'owner').maybeSingle();
+  if (!member) return { error: 'This shop has no owner account yet.' };
+
+  const { data: profile } = await admin.from('profiles').select('email').eq('id', member.user_id).maybeSingle();
+  if (!profile?.email) return { error: 'That owner has no email on file.' };
+
+  // "recovery" rather than "invite": the account already exists, and recovery works whether or not they have
+  // ever set a password. generateLink returns the URL without sending anything.
+  const { data, error } = await admin.auth.admin.generateLink({
+    type: 'recovery',
+    email: profile.email,
+    options: { redirectTo: `${await siteUrl()}/auth/set-password` },
+  });
+  if (error || !data.properties?.action_link) return { error: error?.message ?? 'Could not create a link.' };
+
+  await audit('merchant.invite_link_created', { actorId: user.id, tenantId, detail: { email: profile.email } });
+  return { link: data.properties.action_link, email: profile.email };
+}
+
+// Undo an invite that went nowhere. Guarded hard: only a shop whose owner never signed in and that holds no
+// products, conversations or orders, so this can never be a shortcut to deleting a working merchant.
+export async function revokeInvite(tenantId: string): Promise<{ error?: string; message?: string }> {
+  const { user } = await requireAdmin();
+  const admin = createAdminClient();
+
+  const { data: member } = await admin.from('tenant_members').select('user_id').eq('tenant_id', tenantId).maybeSingle();
+  if (!member) return { error: 'This shop has no account to revoke.' };
+
+  const { data: signins } = await admin.rpc('merchant_signin_status');
+  const signedIn = ((signins ?? []) as { user_id: string; last_sign_in_at: string | null }[]).find((s) => s.user_id === member.user_id);
+  if (signedIn?.last_sign_in_at) return { error: 'They have already signed in. Suspend the shop instead of revoking the invite.' };
+
+  for (const table of ['products', 'conversations', 'orders'] as const) {
+    const { count } = await admin.from(table).select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId);
+    if (count) return { error: `This shop already has ${count} ${table}. Suspend it instead of revoking the invite.` };
+  }
+
+  const { error: memberError } = await admin.from('tenant_members').delete().eq('tenant_id', tenantId);
+  if (memberError) return { error: memberError.message };
+  await admin.auth.admin.deleteUser(member.user_id);
+  const { error: tenantError } = await admin.from('tenants').delete().eq('id', tenantId);
+  if (tenantError) return { error: tenantError.message };
+
+  await audit('merchant.invite_revoked', { actorId: user.id, detail: { tenantId } });
+  revalidatePath('/admin');
+  return { message: 'Invite revoked. The shop and its unused account are gone.' };
+}

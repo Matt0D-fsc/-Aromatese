@@ -38,11 +38,32 @@ export async function saveProduct(input: ProductInput): Promise<{ error: string 
   const voiceTags = [...new Set((Array.isArray(input.voiceTags) ? input.voiceTags : []).map((t) => String(t).trim().toLowerCase()).filter(Boolean))].slice(0, 30);
   const text = (v: string) => String(v ?? '').trim() || null;
 
+  // Variants are validated before the product is written. Doing it afterwards meant a bad size could return an
+  // error with the product's price and stock already changed.
+  const sku = text(input.sku) ?? `SKU-${input.id.slice(0, 8).toUpperCase()}`;
+  const variants = (Array.isArray(input.variants) ? input.variants : [])
+    .map((v) => ({
+      name: String(v?.name ?? '').trim().slice(0, 100),
+      // Blank stays null: search_products coalesces it to the product's price, so the variant follows a later
+      // price change instead of freezing a copy of today's.
+      price_bdt: v?.priceBdt === '' || v?.priceBdt == null ? null : Number(v.priceBdt),
+      stock_quantity: Math.floor(Number(v?.stockQuantity)),
+    }))
+    .filter((v) => v.name)
+    .slice(0, 50);
+
+  if (variants.some((v) => (v.price_bdt !== null && (!Number.isFinite(v.price_bdt) || v.price_bdt < 0)) || !Number.isInteger(v.stock_quantity) || v.stock_quantity < 0)) {
+    return { error: 'Each size or colour needs a whole-number stock, and a price of 0 or more if you set one.' };
+  }
+  if (new Set(variants.map((v) => v.name.toLowerCase())).size !== variants.length) {
+    return { error: 'Two sizes or colours have the same name. Give each one a different name.' };
+  }
+
   // RLS enforces tenant ownership: updating another shop's product id fails the policy check.
   const { error } = await supabase.from('products').upsert({
     id: input.id,
     tenant_id: tenant.id,
-    sku: text(input.sku) ?? `SKU-${input.id.slice(0, 8).toUpperCase()}`,
+    sku,
     title_en: titleEn,
     title_bn: text(input.titleBn),
     title_banglish: text(input.titleBanglish),
@@ -61,34 +82,14 @@ export async function saveProduct(input: ProductInput): Promise<{ error: string 
   });
   if (error) return { error: error.code === '23505' ? 'Another product already uses this SKU.' : error.message };
 
-  // Variants are replaced wholesale rather than diffed: a handful of sizes per product makes matching rows
-  // up more code than simply writing the list the merchant just saw.
-  const variants = (Array.isArray(input.variants) ? input.variants : [])
-    .map((v) => ({
-      name: String(v?.name ?? '').trim().slice(0, 100),
-      price: v?.priceBdt === '' || v?.priceBdt == null ? null : Number(v.priceBdt),
-      stock: Math.floor(Number(v?.stockQuantity)),
-    }))
-    .filter((v) => v.name)
-    .slice(0, 50);
-  if (variants.some((v) => (v.price !== null && (!Number.isFinite(v.price) || v.price < 0)) || !Number.isInteger(v.stock) || v.stock < 0)) {
-    return { error: 'Each size or colour needs a whole-number stock, and a price of 0 or more if you set one.' };
-  }
-
-  await supabase.from('variants').delete().eq('product_id', input.id).eq('tenant_id', tenant.id);
-  if (variants.length) {
-    const { error: variantError } = await supabase.from('variants').insert(
-      variants.map((v) => ({
-        tenant_id: tenant.id,
-        product_id: input.id,
-        name: v.name,
-        sku: `${text(input.sku) ?? input.id.slice(0, 8).toUpperCase()}-${v.name.replace(/\s+/g, '-').toUpperCase().slice(0, 20)}`,
-        price_bdt: v.price,
-        stock_quantity: v.stock,
-      })),
-    );
-    if (variantError) return { error: variantError.message };
-  }
+  // Replaced wholesale rather than diffed, but inside one function so a failed insert cannot leave the product
+  // with the old variants already deleted.
+  const { error: variantError } = await supabase.rpc('save_product_variants', {
+    pid: input.id,
+    tid: tenant.id,
+    rows: variants.map((v) => ({ ...v, sku: `${sku}-${v.name.replace(/\s+/g, '-').toUpperCase().slice(0, 20)}` })),
+  });
+  if (variantError) return { error: variantError.message };
 
   revalidatePath('/dashboard', 'layout');
   redirect('/dashboard/products');

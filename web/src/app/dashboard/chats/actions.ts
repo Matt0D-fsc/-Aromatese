@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { requireMerchant } from '@/lib/auth';
 import { audit, throwAudited } from '@/lib/audit';
 import { CHAT_MEDIA_BUCKET } from '@/lib/chat';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 async function staffSession() {
   const session = await requireMerchant();
@@ -62,12 +63,22 @@ export async function forgetCustomer(customerId: string): Promise<void> {
   if (error) await throwAudited('customer.forget', error, { actorId: user.id, tenantId: tenant.id, detail: { customerId } });
 
   const files = ((paths ?? []) as string[]).filter(Boolean);
+  let removed = 0;
   if (files.length) {
-    const { error: removeError } = await supabase.storage.from(CHAT_MEDIA_BUCKET).remove(files);
-    // The rows are already gone; a failed file delete is a cleanup job, not a reason to fail the request.
-    if (removeError) await audit('error.customer.forget_media', { actorId: user.id, tenantId: tenant.id, detail: { customerId, files: files.length } });
+    // chat-media carries a SELECT policy only (migration 009), so the merchant's own client cannot delete from
+    // it — RLS would reject this silently and leave the voice notes and photos behind while the UI claimed the
+    // customer was forgotten. Deletion runs with the service role, scoped to the paths the function returned.
+    const { data: deleted, error: removeError } = await createAdminClient().storage.from(CHAT_MEDIA_BUCKET).remove(files);
+    removed = deleted?.length ?? 0;
+    if (removeError || removed !== files.length) {
+      await audit('error.customer.forget_media', {
+        actorId: user.id,
+        tenantId: tenant.id,
+        detail: { customerId, expected: files.length, removed, message: removeError?.message ?? 'some files were not removed' },
+      });
+    }
   }
 
-  await audit('customer.forgotten', { actorId: user.id, tenantId: tenant.id, detail: { customerId, mediaDeleted: files.length } });
+  await audit('customer.forgotten', { actorId: user.id, tenantId: tenant.id, detail: { customerId, mediaExpected: files.length, mediaDeleted: removed } });
   revalidatePath('/dashboard', 'layout');
 }

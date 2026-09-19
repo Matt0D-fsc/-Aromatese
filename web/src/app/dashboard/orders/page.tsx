@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { requireMerchant } from '@/lib/auth';
-import { getLang, t } from '@/lib/i18n';
+import { t } from '@/lib/i18n';
+import { getLang } from '@/lib/i18n-server';
 import { btn, btnDanger, btnGhost, card, input, statusBadge } from '@/components/ui';
 import { dhakaTime, searchTerm, taka } from '@/lib/chat';
 import { setOrderStatus } from './actions';

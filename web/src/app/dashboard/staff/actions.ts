@@ -8,10 +8,24 @@ import { siteUrl } from '@/lib/site';
 
 export type StaffState = { error?: string; message?: string };
 
+// requireMerchant only proves membership. Team management hands out access to the whole shop through the
+// service role, so it has to prove ownership as well — otherwise any staff member could add accounts.
+async function requireOwner() {
+  const session = await requireMerchant();
+  const { data } = await session.supabase
+    .from('tenant_members')
+    .select('role')
+    .eq('tenant_id', session.tenant.id)
+    .eq('user_id', session.user.id)
+    .maybeSingle();
+  return { ...session, isOwner: data?.role === 'owner' };
+}
+
 // Staff get their own login rather than sharing the owner's, so the audit trail names a person and losing a
 // phone does not mean changing one password everybody knows.
 export async function inviteStaff(_prev: StaffState, formData: FormData): Promise<StaffState> {
-  const { tenant, user } = await requireMerchant();
+  const { tenant, user, isOwner } = await requireOwner();
+  if (!isOwner) return { error: 'Only the shop owner can add people to the team.' };
   if (tenant.status === 'suspended') return { error: 'Your shop is suspended. Contact the ChatNab team.' };
 
   const email = String(formData.get('email') ?? '').trim().toLowerCase();
@@ -40,7 +54,8 @@ export async function inviteStaff(_prev: StaffState, formData: FormData): Promis
 // Only staff can be removed, and never yourself: an owner must not be able to lock their own shop away, and a
 // shop must never end up with nobody who can sign in.
 export async function removeStaff(userId: string): Promise<void> {
-  const { supabase, tenant, user } = await requireMerchant();
+  const { supabase, tenant, user, isOwner } = await requireOwner();
+  if (!isOwner) throw new Error('Only the shop owner can remove people from the team.');
   if (tenant.status === 'suspended') throw new Error('Your shop is suspended.');
   if (userId === user.id) throw new Error('You cannot remove yourself.');
 

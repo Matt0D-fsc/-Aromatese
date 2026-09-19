@@ -1,5 +1,3 @@
-import { cookies } from 'next/headers';
-
 // The AI has always spoken Bangla to customers while the dashboard spoke only English to the shop owner.
 // This covers the shell a merchant reads on every visit — navigation, page headings, the buttons they press.
 // Adding a screen is one line per string in both dictionaries; a missing key falls back to English rather
@@ -91,10 +89,5 @@ const bn: Partial<Record<Key, string>> = {
 };
 
 const DICTIONARIES: Record<Lang, Partial<Record<Key, string>>> = { en, bn };
-
-export async function getLang(): Promise<Lang> {
-  const value = (await cookies()).get(LANG_COOKIE)?.value;
-  return value === 'bn' ? 'bn' : 'en';
-}
 
 export const t = (lang: Lang, key: Key): string => DICTIONARIES[lang][key] ?? en[key];
