@@ -90,8 +90,8 @@ export async function saveProduct(input: ProductInput): Promise<{ error: string 
     if (variantError) return { error: variantError.message };
   }
 
-  revalidatePath('/dashboard');
-  redirect('/dashboard');
+  revalidatePath('/dashboard', 'layout');
+  redirect('/dashboard/products');
 }
 
 export async function deleteProduct(id: string): Promise<{ error: string } | undefined> {
@@ -107,8 +107,8 @@ export async function deleteProduct(id: string): Promise<{ error: string } | und
   if (error) return { error: error.message };
   await audit('product.deleted', { actorId: user.id, tenantId: tenant.id, detail: { productId: id, files: files?.length ?? 0 } });
 
-  revalidatePath('/dashboard');
-  redirect('/dashboard');
+  revalidatePath('/dashboard', 'layout');
+  redirect('/dashboard/products');
 }
 
 export type AutofillResult = {

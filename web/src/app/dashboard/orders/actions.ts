@@ -16,5 +16,5 @@ export async function setOrderStatus(orderId: string, status: 'confirmed' | 'can
   if (error) await throwAudited('order.status', error, { actorId: user.id, tenantId: tenant.id, detail: { orderId, status } });
 
   await audit(`order.${status}`, { actorId: user.id, tenantId: tenant.id, detail: { orderId } });
-  revalidatePath('/dashboard/orders');
+  revalidatePath('/dashboard', 'layout');
 }

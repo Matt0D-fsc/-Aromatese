@@ -10,6 +10,7 @@ export type Lang = keyof typeof LANGS;
 export const LANG_COOKIE = 'cn_lang';
 
 const en = {
+  'nav.home': 'Home',
   'nav.products': 'Products',
   'nav.chats': 'Chats',
   'nav.orders': 'Orders',
@@ -51,6 +52,7 @@ export type Key = keyof typeof en;
 
 // Only the merchant-facing shell is translated so far. Anything not listed here reads in English.
 const bn: Partial<Record<Key, string>> = {
+  'nav.home': 'হোম',
   'nav.products': 'পণ্য',
   'nav.chats': 'চ্যাট',
   'nav.orders': 'অর্ডার',
