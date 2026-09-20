@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { sendPasswordReset, signIn } from './actions';
 import { btn, card, errorBox, input, label, noticeBox } from '@/components/ui';
+import { Logo } from '@/components/logo';
 
 function LoginForms() {
   const [signInState, signInAction, signingIn] = useActionState(signIn, {});
@@ -50,6 +51,9 @@ function LoginForms() {
 export default function LoginPage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-4">
+      <Link href="/" aria-label="ChatNab home">
+        <Logo />
+      </Link>
       <Suspense>
         <LoginForms />
       </Suspense>

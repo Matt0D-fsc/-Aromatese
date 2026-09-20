@@ -1,21 +1,25 @@
-// The ChatNab wordmark. Drawn as text, not an image, so it uses the app's own Instrument Sans and stays
-// crisp at any size and in either theme. "chat" takes the foreground, "nab" the jade: the same split the
-// accent colour makes everywhere else in the product.
+import Image from 'next/image';
+import mark from '../../public/logo-mark.png';
+
+// The ChatNab lockup: the drawn mark, and the name beside it as live text.
 //
-// The square mark for a favicon or an app icon is app/icon.svg, where the n is a path rather than a letter,
-// because that one is rendered by browsers and by Meta's dashboard, with no guarantee our font is loaded.
+// The supplied artwork sets the name in white, which disappears on a light page, so only the mark is used as
+// an image. Keeping the name as text means it takes the theme's foreground colour in both light and dark,
+// stays sharp at any size, and can be read by anything that reads the page — a picture of a word cannot.
 
 const SIZES = {
-  sm: 'text-lg',
-  md: 'text-2xl',
-  lg: 'text-4xl sm:text-5xl',
+  sm: { mark: 22, text: 'text-lg' },
+  md: { mark: 30, text: 'text-2xl' },
+  lg: { mark: 46, text: 'text-4xl sm:text-5xl' },
 } as const;
 
-export function Logo({ size = 'md', className = '' }: { size?: keyof typeof SIZES; className?: string }) {
+export function Logo({ size = 'md', markOnly = false, className = '' }: { size?: keyof typeof SIZES; markOnly?: boolean; className?: string }) {
+  const { mark: height, text } = SIZES[size];
+
   return (
-    <span className={`font-semibold tracking-tight ${SIZES[size]} ${className}`}>
-      <span className="text-foreground">chat</span>
-      <span className="text-accent">nab</span>
+    <span className={`inline-flex items-center gap-2.5 ${className}`}>
+      <Image src={mark} alt={markOnly ? 'ChatNab' : ''} height={height} style={{ height, width: 'auto' }} priority />
+      {!markOnly && <span className={`font-semibold tracking-tight text-foreground ${text}`}>ChatNab</span>}
     </span>
   );
 }
