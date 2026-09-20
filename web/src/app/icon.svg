@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="ChatNab">
+  <!-- The square mark: the jade half of the wordmark, one letter. The n is a path, never a font character,
+       because this file is rendered by browsers, phone home screens and Meta's app dashboard, none of which
+       load Instrument Sans. -->
+  <rect width="1024" height="1024" rx="232" fill="#1C7C6C"/>
+  <path
+    fill="#ffffff"
+    d="M330 660 L330 372 L414 372 L414 412 C446 380 492 362 540 362 C628 362 694 422 694 512 L694 660 L610 660 L610 520 C610 465 578 436 530 436 C470 436 414 476 414 540 L414 660 Z"
+  />
+</svg>
