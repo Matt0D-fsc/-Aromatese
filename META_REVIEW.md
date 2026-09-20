@@ -132,6 +132,28 @@ account is the review.
 
 ---
 
+## 4b. The AI engine, and why it changed
+
+The platform was set to Mavs Gateway at `http://127.0.0.1:8081/v1`. That works on the machine running Mavs and
+nowhere else: Vercel cannot reach your laptop, so every AI reply in production failed with
+*"Dukkhito, reply dite parlam na."* A reviewer opening the demo chat would have seen a broken product.
+
+`platform_settings.ai_provider` is now `gemini`, which runs on `GEMINI_API_KEY` and needs no infrastructure of
+ours. The Mavs base URL, model and key are untouched in the same row, so putting it back is one word once Mavs
+has a public address:
+
+```sql
+UPDATE platform_settings SET ai_provider = 'custom' WHERE id = true;
+```
+
+**Replies take 18–27 seconds.** Measured, not estimated, and not cold start. One customer question costs three
+model calls — search, show, answer — and they run one after another. It is slow but it works; Meta is checking
+that the integration functions, not timing it. Two things follow:
+
+- When recording the screencast, cut the waiting or say "the assistant is thinking" over it. Twenty seconds of
+  dead air looks like a hang.
+- This is worth fixing before merchants see it, and it is the same latency the Mavs work was aimed at.
+
 ## 5. Screencast shot list
 
 One recording, two to three minutes, no cuts if you can manage it. Reviewers reject vague videos, so show the
