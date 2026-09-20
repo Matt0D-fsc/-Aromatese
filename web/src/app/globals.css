@@ -14,7 +14,7 @@
 
 @theme {
   /* The neutral scale is redefined in place rather than renamed: every zinc-* utility already in the
-     app becomes warm at once, and nothing has to be swept file by file. Warm greys beside the jade
+     app becomes warm at once, and nothing has to be swept file by file. Warm greys beside the green
      read as a shop; the cool default read as a dashboard.
      Text steps are a little darker than Tailwind's, so the 80 text-zinc-500 labels clear 4.5:1. */
   --color-zinc-50: oklch(0.985 0.004 85);
@@ -37,10 +37,15 @@
   --color-line: oklch(0.917 0.008 85);
   --color-muted: oklch(0.55 0.013 78);
 
-  --color-accent: oklch(0.52 0.09 168);
+  /* The logo's green, at a lightness that can carry white text. The mark itself averages hue 138 at chroma
+     0.24 and lightness 0.82 — far too light to put white on, and --color-accent is also used as a text colour
+     (text-accent on the current nav tab, the usage meter), so it has to read on a white card too. Same hue,
+     darker: the brightness of the mark lives in accent-soft and in the logo itself.
+     Checked: white on accent 4.96:1, accent on white 4.96:1, accent-strong on accent-soft 6.38:1. */
+  --color-accent: oklch(0.53 0.16 138);
   --color-accent-foreground: oklch(1 0 0);
-  --color-accent-soft: oklch(0.95 0.02 168);
-  --color-accent-strong: oklch(0.43 0.08 168);
+  --color-accent-soft: oklch(0.95 0.045 138);
+  --color-accent-strong: oklch(0.44 0.15 138);
 
   --color-warning: oklch(0.59 0.12 70);
   --color-warning-foreground: oklch(1 0 0);
@@ -79,10 +84,11 @@
     --color-line: oklch(0.31 0.009 75);
     --color-muted: oklch(0.72 0.012 80);
 
-    --color-accent: oklch(0.75 0.11 168);
+    /* On a dark page the mark's own brightness works, so this sits much closer to the logo. */
+    --color-accent: oklch(0.78 0.17 138);
     --color-accent-foreground: oklch(0.17 0.006 75);
-    --color-accent-soft: oklch(0.28 0.04 168);
-    --color-accent-strong: oklch(0.85 0.1 168);
+    --color-accent-soft: oklch(0.29 0.06 138);
+    --color-accent-strong: oklch(0.87 0.16 138);
 
     --color-warning: oklch(0.76 0.13 70);
     --color-warning-foreground: oklch(0.17 0.006 75);
