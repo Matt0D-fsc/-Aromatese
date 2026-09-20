@@ -1,8 +1,12 @@
 // Generates catalogue photos for a demo shop's products and attaches them.
 //
-//   node scripts/demo-product-photos.mjs demo-shop            # only products with no photo yet
-//   node scripts/demo-product-photos.mjs demo-shop --force    # replace what is there
-//   node scripts/demo-product-photos.mjs demo-shop --dry-run  # print the prompts, call nothing
+//   node scripts/demo-product-photos.mjs demo-shop                        # generate, only where missing
+//   node scripts/demo-product-photos.mjs demo-shop --from assets/demo-products   # use files you made
+//   node scripts/demo-product-photos.mjs demo-shop --force                # replace what is there
+//   node scripts/demo-product-photos.mjs demo-shop --dry-run              # print the prompts, call nothing
+//
+// With --from, each file is matched to a product by its SKU: DRESS-BLUE-MIDI.png attaches to the product
+// whose SKU is DRESS-BLUE-MIDI. Case and extension do not matter (.png .jpg .jpeg .webp).
 //
 // For demo and review shops only. A real merchant's catalogue must show the thing they actually sell —
 // an invented photo of a saree nobody owns is a lie told to their customer, not a placeholder.
@@ -11,7 +15,8 @@
 //   OPENAI_API_KEY   (default, gpt-image-1; override with IMAGE_MODEL)
 //   GOOGLE_API_KEY   (an AI Studio key, the AIza... kind; override with IMAGE_MODEL)
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join, extname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 
@@ -35,6 +40,21 @@ const env = Object.fromEntries(
 const [slug, ...flags] = process.argv.slice(2);
 const force = flags.includes('--force');
 const dryRun = flags.includes('--dry-run');
+const fromDir = flags[flags.indexOf('--from') + 1] && flags.includes('--from') ? flags[flags.indexOf('--from') + 1] : null;
+
+const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.webp']);
+
+// Files you made yourself, matched to products by SKU. Anything that is not an image, or whose name is not a
+// SKU in this shop, is reported rather than silently skipped — a typo in a filename is the likely mistake.
+function filesBySku(dir) {
+  const found = new Map();
+  for (const name of readdirSync(dir)) {
+    const ext = extname(name).toLowerCase();
+    if (!IMAGE_EXT.has(ext)) continue;
+    found.set(basename(name, extname(name)).toUpperCase(), join(dir, name));
+  }
+  return found;
+}
 if (!slug) fail('Usage: node scripts/demo-product-photos.mjs <shop-slug> [--force] [--dry-run]');
 
 function fail(message) {
@@ -92,25 +112,32 @@ if (!tenant) fail(`No shop with slug "${slug}".`);
 
 const { data: products, error } = await db
   .from('products')
-  .select('id, title_en, category, image_urls')
+  .select('id, sku, title_en, category, image_urls')
   .eq('tenant_id', tenant.id)
   .eq('is_active', true)
   .order('created_at');
 if (error) fail(error.message);
 
-const todo = products.filter((p) => force || !(p.image_urls ?? []).length);
-console.log(`${tenant.name}: ${products.length} products, ${todo.length} to do${force ? ' (--force)' : ''}.`);
+const supplied = fromDir ? filesBySku(fromDir) : null;
+const todo = products.filter((p) => (supplied ? supplied.has((p.sku ?? '').toUpperCase()) : force || !(p.image_urls ?? []).length));
+console.log(`${tenant.name}: ${products.length} products, ${todo.length} to do${force ? ' (--force)' : ''}${fromDir ? ` from ${fromDir}` : ''}.`);
+
+if (supplied) {
+  const skus = new Set(products.map((p) => (p.sku ?? '').toUpperCase()));
+  for (const name of supplied.keys()) if (!skus.has(name)) console.log(`  ignored: ${name} — no product with that SKU`);
+  for (const p of products) if (!supplied.has((p.sku ?? '').toUpperCase())) console.log(`  no file for: ${p.sku} (${p.title_en})`);
+}
 
 for (const product of todo) {
   const prompt = promptFor(product);
   if (dryRun) {
-    console.log(`\n${product.title_en}\n  ${prompt}`);
+    console.log(`\n${product.title_en}  [${product.sku}]\n  ${prompt}`);
     continue;
   }
 
   process.stdout.write(`${product.title_en} … `);
   try {
-    const raw = await generate(prompt);
+    const raw = supplied ? readFileSync(supplied.get((product.sku ?? '').toUpperCase())) : await generate(prompt);
     // Square and modest: these are shown in a card a few hundred pixels wide, often on a phone on mobile data.
     const png = await sharp(raw).resize(SIZE, SIZE, { fit: 'cover' }).png({ quality: 90, effort: 9 }).toBuffer();
 
