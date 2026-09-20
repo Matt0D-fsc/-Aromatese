@@ -31,7 +31,8 @@ Status as of 2026-09-19. The pre-launch build scope lives in SCOPE.md; all three
 - [ ] Hands-on test: voice notes (webm/opus from a real phone; Gemini accepted the container in a synthetic test)
 - [ ] Hands-on test: merchant invite email
 - [ ] Hands-on test: ChatNab through Mavs Gateway (full order conversation, AI fill JSON output, forced fallback to Opus)
-- [ ] Clean up test data (Demo Shop BD, test orders, test conversations)
+- [ ] Clean up test data (test orders, test conversations) — NOT Demo Shop BD: it is the Meta reviewer's
+      demo shop, see META_REVIEW.md. Delete it only after app review has passed.
 
 ## 2. Must-have before the first real merchant
 - [ ] Deploy: hosting (e.g. Vercel) + domain + HTTPS (also enables the microphone on phones)
